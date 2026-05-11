@@ -28,3 +28,13 @@ Thumbs.db
 
 # Vite cache
 .vite/
+
+# Documentation files (keep only README.md)
+*_FIX.md
+*_GUIDE.md
+*_SUMMARY.md
+*_FIXES.md
+*QUICK_START.md
+*PROTECTION.md
+*REFERENCE.md
+*MANAGEMENT*.md

@@ -5,18 +5,18 @@ import api from "../api/api";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { Button } from "./ui/button";
 import { useToast } from "./ui/toast";
+import useAuthStore from "../store/authStore";
 
 export default function ProductCard({ product }) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const token = useAuthStore((s) => s.token);
 
   const imageUrl = product.image_url
     ? `http://127.0.0.1:8000${product.image_url}`
     : "https://placehold.co/300x300?text=No+Image";
 
   const handleAddToCart = async () => {
-    const token = localStorage.getItem("access_token");
-
     if (!token) {
       toast({ title: "Please login first", variant: "destructive" });
       navigate("/login");
@@ -39,25 +39,28 @@ export default function ProductCard({ product }) {
   };
 
   return (
-    <Card className="flex flex-col hover:shadow-md transition-shadow">
+    <Card className="flex flex-col hover:shadow-md transition-shadow dark:bg-gray-800 dark:border-gray-700">
       {/* Product image */}
       <Link to={`/product/${product.id}`}>
-        <div className="h-48 w-full overflow-hidden rounded-t-xl bg-gray-50">
+        <div className="h-48 w-full overflow-hidden rounded-t-xl bg-gray-50 dark:bg-gray-700">
           <img
             src={imageUrl}
             alt={product.name}
             className="h-full w-full object-contain p-2 hover:scale-105 transition-transform duration-200"
+            onError={(e) => {
+              e.target.src = "https://placehold.co/300x300?text=No+Image";
+            }}
           />
         </div>
       </Link>
 
       <CardContent className="flex-1 pt-4">
         <Link to={`/product/${product.id}`}>
-          <h2 className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2 hover:text-blue-600 transition-colors">
+          <h2 className="font-semibold text-gray-800 dark:text-gray-200 text-sm leading-snug line-clamp-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
             {product.name}
           </h2>
         </Link>
-        <p className="mt-2 text-lg font-bold text-blue-600">
+        <p className="mt-2 text-lg font-bold text-blue-600 dark:text-blue-400">
           ₹{Number(product.price).toFixed(2)}
         </p>
       </CardContent>

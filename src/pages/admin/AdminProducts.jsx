@@ -1,0 +1,269 @@
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import api from "../../api/api";
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
+import { useToast } from "../../components/ui/toast";
+import { Loader2, Pencil, Trash2, Plus, X, RefreshCw } from "lucide-react";
+
+const productSchema = z.object({
+  name:           z.string().min(1, "Name is required"),
+  description:    z.string().optional(),
+  price:          z.coerce.number().positive("Price must be positive"),
+  stock_quantity: z.coerce.number().int().min(0, "Stock cannot be negative"),
+});
+
+// ── Product Form (create / edit) ─────────────────────────────────────────────
+const ProductForm = ({ initial, onClose, onSaved }) => {
+  const { toast } = useToast();
+  const [imageFile, setImageFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const { register, handleSubmit, formState: { errors } } = useForm({
+    resolver: zodResolver(productSchema),
+    defaultValues: initial ?? { name: "", description: "", price: "", stock_quantity: "" },
+  });
+
+  const onSubmit = async (data) => {
+    setSaving(true);
+    try {
+      let res;
+      if (initial?.id) {
+        // Edit
+        res = await api.put(`/products/${initial.id}`, data);
+      } else {
+        // Create
+        res = await api.post("/products/", data);
+      }
+
+      // Upload image if selected
+      if (imageFile && res.data?.id) {
+        const form = new FormData();
+        form.append("file", imageFile);
+        await api.post(`/products/${res.data.id}/upload-image`, form, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      toast({ title: initial?.id ? "Product updated" : "Product created" });
+      onSaved();
+    } catch (err) {
+      toast({
+        title: "Failed to save product",
+        description: err.response?.data?.detail || "Try again",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <Card className="w-full max-w-lg dark:bg-gray-800 dark:border-gray-700">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="dark:text-white">
+              {initial?.id ? "Edit Product" : "New Product"}
+            </CardTitle>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+              <X size={20} />
+            </button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+            {[
+              { id: "name",           label: "Product Name",  placeholder: "e.g. Wireless Headphones", type: "text" },
+              { id: "description",    label: "Description",   placeholder: "Optional description",      type: "text" },
+              { id: "price",          label: "Price (₹)",     placeholder: "e.g. 499",                  type: "number" },
+              { id: "stock_quantity", label: "Stock Quantity", placeholder: "e.g. 50",                  type: "number" },
+            ].map(({ id, label, placeholder, type }) => (
+              <div key={id}>
+                <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {label}
+                </label>
+                <Input
+                  id={id}
+                  type={type}
+                  placeholder={placeholder}
+                  className="dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  {...register(id)}
+                />
+                {errors[id] && (
+                  <p className="mt-1 text-xs text-red-500" role="alert">{errors[id].message}</p>
+                )}
+              </div>
+            ))}
+
+            {/* Image upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Product Image
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+                className="text-sm text-gray-600 dark:text-gray-300 file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-sm file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button type="submit" className="flex-1" disabled={saving}>
+                {saving ? <Loader2 size={16} className="animate-spin" /> : (initial?.id ? "Save Changes" : "Create Product")}
+              </Button>
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ── Main page ────────────────────────────────────────────────────────────────
+const AdminProducts = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState(null); // product to edit
+
+  const { data: products = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      const res = await api.get("/products/?skip=0&limit=100");
+      return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+    },
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    retry: 1,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => api.delete(`/products/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      toast({ title: "Product deleted" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Delete failed",
+        description: err.response?.data?.detail || "Try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = (product) => {
+    if (!window.confirm(`Delete "${product.name}"?`)) return;
+    deleteMutation.mutate(product.id);
+  };
+
+  const handleSaved = () => {
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+    setFormOpen(false);
+    setEditing(null);
+  };
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Products</h1>
+        <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="flex items-center gap-2">
+          <Plus size={16} /> Add Product
+        </Button>
+      </div>
+
+      {isLoading && (
+        <div className="flex justify-center py-20">
+          <Loader2 size={32} className="animate-spin text-blue-500" />
+        </div>
+      )}
+
+      {isError && (
+        <div className="text-center py-20">
+          <p className="text-red-500 mb-4">Failed to load products.</p>
+          <Button variant="outline" onClick={() => refetch()} className="flex items-center gap-2 mx-auto">
+            <RefreshCw size={15} /> Retry
+          </Button>
+        </div>
+      )}
+
+      {!isLoading && !isError && (
+        <div className="space-y-3">
+          {products.length === 0 && (
+            <p className="text-center text-gray-500 dark:text-gray-400 py-10">No products yet.</p>
+          )}
+          {products.map((product) => {
+            const imageUrl = product.image_url
+              ? `http://127.0.0.1:8000${product.image_url}`
+              : null;
+
+            return (
+              <Card key={product.id} className="dark:bg-gray-800 dark:border-gray-700">
+                <CardContent className="flex items-center gap-4 py-3">
+                  {/* Image */}
+                  <div className="h-14 w-14 rounded bg-gray-100 dark:bg-gray-700 shrink-0 overflow-hidden">
+                    {imageUrl
+                      ? <img src={imageUrl} alt={product.name} className="h-full w-full object-contain" />
+                      : <div className="h-full w-full bg-gray-200 dark:bg-gray-600" />
+                    }
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      ₹{Number(product.price).toFixed(2)} · Stock: {product.stock_quantity ?? "—"}
+                    </p>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => { setEditing(product); setFormOpen(true); }}
+                      className="flex items-center gap-1"
+                    >
+                      <Pencil size={13} /> Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDelete(product)}
+                      disabled={deleteMutation.isPending}
+                      className="flex items-center gap-1"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create / Edit modal */}
+      {formOpen && (
+        <ProductForm
+          initial={editing}
+          onClose={() => { setFormOpen(false); setEditing(null); }}
+          onSaved={handleSaved}
+        />
+      )}
+    </div>
+  );
+};
+
+export default AdminProducts;

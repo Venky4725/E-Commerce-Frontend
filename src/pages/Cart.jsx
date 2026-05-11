@@ -5,6 +5,7 @@ import { Card, CardContent } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { ShoppingCart, Loader2, PackageOpen, Trash2, Plus, Minus } from "lucide-react";
 import { useToast } from "../components/ui/toast";
+import useAuthStore from "../store/authStore";
 
 const Cart = () => {
   const [items, setItems] = useState([]);   // enriched items: { product_id, quantity, product }
@@ -14,7 +15,7 @@ const Cart = () => {
   const [pending, setPending] = useState({});
 
   const { toast } = useToast();
-  const token = localStorage.getItem("access_token");
+  const token = useAuthStore((s) => s.token);
 
   // ── Initial fetch ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -287,17 +288,20 @@ const Cart = () => {
           })}
 
           {/* Order summary */}
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 mt-2">
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-5 mt-2">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-500 text-sm">
+              <span className="text-gray-500 dark:text-gray-400 text-sm">
                 Subtotal ({items.length} item{items.length !== 1 ? "s" : ""})
               </span>
-              <span className="font-semibold text-gray-800">₹{total.toFixed(2)}</span>
+              <span className="font-semibold text-gray-800 dark:text-gray-200">₹{total.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between items-center border-t border-gray-200 pt-3 mt-1">
-              <span className="font-bold text-gray-900 text-lg">Total</span>
+            <div className="flex justify-between items-center border-t border-gray-200 dark:border-gray-600 pt-3 mt-1 mb-4">
+              <span className="font-bold text-gray-900 dark:text-white text-lg">Total</span>
               <span className="font-bold text-blue-600 text-xl">₹{total.toFixed(2)}</span>
             </div>
+            <Link to="/checkout">
+              <Button className="w-full" size="lg">Proceed to Checkout</Button>
+            </Link>
           </div>
 
         </div>

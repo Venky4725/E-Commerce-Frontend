@@ -1,39 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import api from "../api/api";
+import { useProduct } from "../hooks/useProducts";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { useToast } from "../components/ui/toast";
-import { ShoppingCart, ArrowLeft, Loader2 } from "lucide-react";
+import { ShoppingCart, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
+import api from "../api/api";
+import useAuthStore from "../store/authStore";
 
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const token = useAuthStore((s) => s.token);
   const [addingToCart, setAddingToCart] = useState(false);
 
-  useEffect(() => {
-    const fetchProduct = async () => {
-      setLoading(true);
-      try {
-        const res = await api.get(`/products/${id}`);
-        setProduct(res.data);
-      } catch (err) {
-        setError("Product not found or failed to load.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProduct();
-  }, [id]);
+  // React Query
+  const { data: product, isLoading, isError, refetch } = useProduct(id);
 
   const handleAddToCart = async () => {
-    const user = JSON.parse(localStorage.getItem("user") || "null");
-    if (!user) {
+    if (!token) {
       toast({ title: "Please login first", variant: "destructive" });
       navigate("/login");
       return;
@@ -41,7 +27,7 @@ const ProductDetail = () => {
 
     setAddingToCart(true);
     try {
-      await api.post(`/cart/${user.id}/items`, {
+      await api.post("/cart/me/items", {
         product_id: product.id,
         quantity: 1,
       });
@@ -57,7 +43,7 @@ const ProductDetail = () => {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <Loader2 size={36} className="animate-spin text-blue-500" />
@@ -65,13 +51,18 @@ const ProductDetail = () => {
     );
   }
 
-  if (error || !product) {
+  if (isError || !product) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-        <p className="text-red-500 text-lg mb-4">{error || "Product not found"}</p>
-        <Link to="/">
-          <Button variant="outline">Back to Products</Button>
-        </Link>
+        <p className="text-red-500 text-lg mb-4">Product not found or failed to load.</p>
+        <div className="flex gap-3 justify-center">
+          <Button variant="outline" onClick={() => refetch()} className="flex items-center gap-2">
+            <RefreshCw size={15} /> Retry
+          </Button>
+          <Link to="/">
+            <Button variant="outline">Back to Products</Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -85,49 +76,60 @@ const ProductDetail = () => {
       {/* Back link */}
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors"
+        className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 mb-6 transition-colors"
       >
         <ArrowLeft size={16} /> Back
       </button>
 
-      <Card>
+      <Card className="dark:bg-gray-800 dark:border-gray-700">
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row">
             {/* Image */}
-            <div className="md:w-1/2 bg-gray-50 rounded-t-xl md:rounded-l-xl md:rounded-tr-none flex items-center justify-center p-8 min-h-72">
+            <div className="md:w-1/2 bg-gray-50 dark:bg-gray-700 rounded-t-xl md:rounded-l-xl md:rounded-tr-none flex items-center justify-center p-8 min-h-72">
               <img
                 src={imageUrl}
                 alt={product.name}
                 className="max-h-80 w-full object-contain"
+                onError={(e) => {
+                  e.target.src = "https://placehold.co/600x400?text=No+Image";
+                }}
               />
             </div>
 
             {/* Details */}
             <div className="md:w-1/2 p-8 flex flex-col justify-between">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-3">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-3">
                   {product.name}
                 </h1>
 
-                <p className="text-3xl font-bold text-blue-600 mb-6">
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-6">
                   ₹{Number(product.price).toFixed(2)}
                 </p>
 
                 {product.description && (
                   <div className="mb-6">
-                    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
                       Description
                     </h2>
-                    <p className="text-gray-700 leading-relaxed">
+                    <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
                       {product.description}
                     </p>
                   </div>
+                )}
+
+                {product.stock_quantity !== undefined && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    {product.stock_quantity > 0
+                      ? `${product.stock_quantity} in stock`
+                      : "Out of stock"}
+                  </p>
                 )}
               </div>
 
               <Button
                 onClick={handleAddToCart}
-                disabled={addingToCart}
+                disabled={addingToCart || product.stock_quantity === 0}
                 className="w-full flex items-center gap-2 mt-4"
                 size="lg"
               >
@@ -136,7 +138,7 @@ const ProductDetail = () => {
                 ) : (
                   <ShoppingCart size={18} />
                 )}
-                {addingToCart ? "Adding..." : "Add to Cart"}
+                {addingToCart ? "Adding..." : product.stock_quantity === 0 ? "Out of Stock" : "Add to Cart"}
               </Button>
             </div>
           </div>
