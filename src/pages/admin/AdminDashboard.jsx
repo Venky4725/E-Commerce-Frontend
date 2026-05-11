@@ -1,10 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Package, ClipboardList, LayoutDashboard, TrendingUp, DollarSign, ShoppingBag, Users, Loader2, CheckCircle, Clock, Truck, AlertCircle } from "lucide-react";
+import { Package, ClipboardList, LayoutDashboard, TrendingUp, DollarSign, ShoppingBag, Users, Loader2, CheckCircle, Clock, Truck, AlertCircle, RefreshCw } from "lucide-react";
 
 // Format currency in Indian Rupee style
 const formatCurrency = (amount) => {
@@ -16,6 +16,8 @@ const formatCurrency = (amount) => {
 };
 
 const AdminDashboard = () => {
+  const queryClient = useQueryClient();
+  
   // Try to fetch from /admin/stats endpoint first, fallback to manual calculation
   const { data: statsData, isLoading: loadingStats, isError: statsError } = useQuery({
     queryKey: ["admin-stats"],
@@ -97,12 +99,28 @@ const AdminDashboard = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <LayoutDashboard size={32} className="text-blue-500" />
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <LayoutDashboard size={32} className="text-blue-500" />
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400">Manage your e-commerce store</p>
         </div>
-        <p className="text-gray-600 dark:text-gray-400">Manage your e-commerce store</p>
+        <Button
+          variant="outline"
+          onClick={() => {
+            console.log("🔄 Refreshing dashboard stats...");
+            queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
+          }}
+          className="flex items-center gap-2"
+          disabled={isLoading}
+        >
+          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+          Refresh
+        </Button>
       </div>
 
       {/* Analytics Cards - Row 1 */}

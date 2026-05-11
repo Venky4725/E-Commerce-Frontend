@@ -151,8 +151,17 @@ const Orders = () => {
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Track and manage your orders</p>
         </div>
-        <Button variant="outline" onClick={() => refetch()} className="flex items-center gap-2">
-          <RefreshCw size={16} /> Refresh
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            console.log("🔄 Refreshing orders...");
+            refetch();
+          }} 
+          className="flex items-center gap-2"
+          disabled={isLoading}
+        >
+          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} /> 
+          Refresh
         </Button>
       </div>
 

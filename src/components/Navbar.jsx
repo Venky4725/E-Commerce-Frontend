@@ -4,6 +4,7 @@ import { ShoppingCart, User, LogOut, Menu, X, Store, Moon, Sun, ClipboardList, L
 import { Button } from "./ui/button";
 import useAuthStore from "../store/authStore";
 import useThemeStore from "../store/themeStore";
+import useNotificationStore from "../store/notificationStore";
 import NotificationBell from "./NotificationBell";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -12,20 +13,25 @@ const Navbar = () => {
   const queryClient = useQueryClient();
   const { token, user, logout } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
+  const { clearAllNotifications } = useNotificationStore();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
     console.log("🚪 Logout button clicked");
     
-    // 1. Clear React Query cache
+    // 1. Clear notifications for this user
+    clearAllNotifications();
+    console.log("✅ Notifications cleared");
+    
+    // 2. Clear React Query cache
     queryClient.clear();
     console.log("✅ React Query cache cleared");
     
-    // 2. Clear auth store (also clears localStorage)
+    // 3. Clear auth store (also clears localStorage)
     logout();
     console.log("✅ Auth store cleared");
     
-    // 3. Navigate to login
+    // 4. Navigate to login
     navigate("/login");
     console.log("✅ Navigated to login");
   };

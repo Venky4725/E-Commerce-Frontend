@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import DebugPanel from "./components/DebugPanel";
+import NotificationToast from "./components/NotificationToast";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -59,6 +60,9 @@ const App = () => {
             </Route>
           </Routes>
         </main>
+        
+        {/* Notification Toast Popups */}
+        <NotificationToast />
         
         {/* Debug panel - only in development */}
         {import.meta.env.DEV && <DebugPanel />}

@@ -6,7 +6,6 @@ import { Button } from "../../components/ui/button";
 import { useToast } from "../../components/ui/toast";
 import { Loader2, RefreshCw, ClipboardList, Package, User, Calendar, MapPin, Phone, Trash2, Shield, AlertTriangle } from "lucide-react";
 import { extractErrorMessage, logError } from "../../lib/errorUtils";
-import useNotificationStore from "../../store/notificationStore";
 import OrderTimeline from "../../components/OrderTimeline";
 
 const ORDER_STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
@@ -31,7 +30,6 @@ const StatusBadge = ({ status }) => {
 const AdminOrders = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { addNotification } = useNotificationStore();
   const [updatingId, setUpdatingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -72,17 +70,11 @@ const AdminOrders = () => {
       
       toast({ title: "Order status updated successfully" });
       
-      // Add notification for user
-      const notificationMessages = {
-        shipped: { title: "Order Shipped!", message: `Your order #${variables.id} has been shipped and is on its way.`, type: "order_shipped" },
-        delivered: { title: "Order Delivered!", message: `Your order #${variables.id} has been delivered successfully.`, type: "order_delivered" },
-        cancelled: { title: "Order Cancelled", message: `Your order #${variables.id} has been cancelled.`, type: "order_cancelled" },
-      };
-      
-      const notification = notificationMessages[variables.status];
-      if (notification) {
-        addNotification(notification);
-      }
+      // NOTE: Notifications are NOT added here because:
+      // 1. Admin should not see customer notifications
+      // 2. Customer notifications should come from backend/WebSocket
+      // 3. This is a client-side only implementation
+      // In a real app, backend would send notification to the customer
       
       setUpdatingId(null);
     },
@@ -183,8 +175,17 @@ const AdminOrders = () => {
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">View and manage all customer orders</p>
         </div>
-        <Button variant="outline" onClick={() => refetch()} className="flex items-center gap-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800">
-          <RefreshCw size={16} /> Refresh
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            console.log("🔄 Refreshing admin orders...");
+            refetch();
+          }} 
+          className="flex items-center gap-2 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+          disabled={isLoading}
+        >
+          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} /> 
+          Refresh
         </Button>
       </div>
 
