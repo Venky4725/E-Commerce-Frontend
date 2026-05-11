@@ -30,11 +30,14 @@ Thumbs.db
 .vite/
 
 # Documentation files (keep only README.md)
-*_FIX.md
-*_GUIDE.md
-*_SUMMARY.md
-*_FIXES.md
-*QUICK_START.md
-*PROTECTION.md
-*REFERENCE.md
-*MANAGEMENT*.md
+*_FIX*.md
+*_GUIDE*.md
+*_SUMMARY*.md
+*_FIXES*.md
+*_CHECKLIST*.md
+QUICK_*.md
+TESTING_*.md
+IMPLEMENTATION_*.md
+NOTIFICATION_*.md
+FIXES_*.md
+REACT_*.md
