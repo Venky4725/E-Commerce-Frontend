@@ -8,7 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/ca
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { useToast } from "../../components/ui/toast";
-import { Loader2, Pencil, Trash2, Plus, X, RefreshCw } from "lucide-react";
+import { Loader2, Pencil, Trash2, Plus, X, RefreshCw, Upload } from "lucide-react";
+import { buildAssetUrl } from "../../api/endpoints";
+import BulkUploadModal from "../../components/BulkUploadModal";
 
 const productSchema = z.object({
   name:           z.string().min(1, "Name is required"),
@@ -134,8 +136,9 @@ const AdminProducts = () => {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null); // product to edit
+  const [bulkOpen, setBulkOpen] = useState(false);
 
-  const { data: products = [], isLoading, isError, refetch } = useQuery({
+  const { data: products = [], isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
       const res = await api.get("/products/?skip=0&limit=100");
@@ -149,11 +152,21 @@ const AdminProducts = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/products/${id}`),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ["products"] });
+      const previousProducts = queryClient.getQueryData(["products"]);
+      queryClient.setQueryData(["products"], (current = []) =>
+        current.filter((product) => product.id !== id)
+      );
+      return { previousProducts };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
       toast({ title: "Product deleted" });
     },
-    onError: (err) => {
+    onError: (err, _id, context) => {
+      queryClient.setQueryData(["products"], context?.previousProducts || []);
       toast({
         title: "Delete failed",
         description: err.response?.data?.detail || "Try again",
@@ -169,18 +182,34 @@ const AdminProducts = () => {
 
   const handleSaved = () => {
     queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
     setFormOpen(false);
     setEditing(null);
+  };
+
+  const handleRefresh = async () => {
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
+    await refetch();
   };
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Products</h1>
-        <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="flex items-center gap-2">
-          <Plus size={16} /> Add Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleRefresh} disabled={isFetching} className="flex items-center gap-2">
+            <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
+            {isFetching ? "Refreshing" : "Refresh"}
+          </Button>
+          <Button variant="secondary" onClick={() => setBulkOpen(true)} className="flex items-center gap-2">
+            <Upload size={16} /> Bulk Upload
+          </Button>
+          <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="flex items-center gap-2">
+            <Plus size={16} /> Add Product
+          </Button>
+        </div>
       </div>
 
       {isLoading && (
@@ -205,7 +234,7 @@ const AdminProducts = () => {
           )}
           {products.map((product) => {
             const imageUrl = product.image_url
-              ? `http://127.0.0.1:8000${product.image_url}`
+              ? buildAssetUrl(product.image_url)
               : null;
 
             return (
@@ -214,8 +243,8 @@ const AdminProducts = () => {
                   {/* Image */}
                   <div className="h-14 w-14 rounded bg-gray-100 dark:bg-gray-700 shrink-0 overflow-hidden">
                     {imageUrl
-                      ? <img src={imageUrl} alt={product.name} className="h-full w-full object-contain" />
-                      : <div className="h-full w-full bg-gray-200 dark:bg-gray-600" />
+                      ? <img src={imageUrl} alt={product.name} className="h-full w-full object-contain" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E"; }} loading="lazy" />
+                      : <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E" alt="No image" className="h-full w-full object-contain opacity-50 grayscale" loading="lazy" />
                     }
                   </div>
 
@@ -262,8 +291,16 @@ const AdminProducts = () => {
           onSaved={handleSaved}
         />
       )}
+
+      {/* Bulk Upload modal */}
+      {bulkOpen && (
+        <BulkUploadModal
+          onClose={() => setBulkOpen(false)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 };
 
-export default AdminProducts;
+export default React.memo(AdminProducts);

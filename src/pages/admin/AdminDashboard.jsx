@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
@@ -19,15 +19,13 @@ const AdminDashboard = () => {
   const queryClient = useQueryClient();
   
   // Try to fetch from /admin/stats endpoint first, fallback to manual calculation
-  const { data: statsData, isLoading: loadingStats, isError: statsError } = useQuery({
+  const { data: statsData, isLoading: loadingStats, isFetching: fetchingStats, isError: statsError, refetch: refetchStats } = useQuery({
     queryKey: ["admin-stats"],
     queryFn: async () => {
       try {
         const res = await api.get("/admin/stats");
-        console.log("📊 Admin stats from API:", res.data);
         return res.data;
       } catch (err) {
-        console.log("⚠️ /admin/stats not available, will calculate manually");
         throw err;
       }
     },
@@ -37,7 +35,7 @@ const AdminDashboard = () => {
   });
 
   // Fetch products for manual calculation
-  const { data: products = [], isLoading: loadingProducts } = useQuery({
+  const { data: products = [], isLoading: loadingProducts, isFetching: fetchingProducts, refetch: refetchProducts } = useQuery({
     queryKey: ["admin-products-count"],
     queryFn: async () => {
       const res = await api.get("/products/?skip=0&limit=1000");
@@ -50,11 +48,10 @@ const AdminDashboard = () => {
   });
 
   // Fetch orders for manual calculation
-  const { data: orders = [], isLoading: loadingOrders } = useQuery({
+  const { data: orders = [], isLoading: loadingOrders, isFetching: fetchingOrders, refetch: refetchOrders } = useQuery({
     queryKey: ["admin-orders"],
     queryFn: async () => {
       const res = await api.get("/orders/all");
-      console.log("📋 All orders for stats:", res.data);
       return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
     },
     staleTime: 0, // Always fetch fresh
@@ -63,15 +60,25 @@ const AdminDashboard = () => {
     enabled: statsError || !statsData, // Only fetch if stats API failed
   });
 
+  // Fetch users for manual calculation
+  const { data: usersData = [], isLoading: loadingUsers, refetch: refetchUsers } = useQuery({
+    queryKey: ["admin-users-count"],
+    queryFn: async () => {
+      const res = await api.get("/admin/users");
+      return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    enabled: statsError || !statsData,
+  });
+
   // Calculate analytics manually if API not available
-  const stats = statsData || {
+  const stats = useMemo(() => statsData || {
     total_revenue: orders
       .filter(o => o.status?.toLowerCase() === "delivered")
       .reduce((sum, order) => {
-        // Try multiple field names for total
         let orderTotal = order.total_amount ?? order.total_price ?? order.total ?? 0;
-        
-        // Fallback: Calculate from items if total is 0 or missing
         if (orderTotal === 0) {
           const items = order.order_items ?? order.items ?? [];
           orderTotal = items.reduce((itemSum, item) => {
@@ -80,21 +87,30 @@ const AdminDashboard = () => {
             return itemSum + (price * qty);
           }, 0);
         }
-        
         return sum + orderTotal;
       }, 0),
     total_orders: orders.length,
     total_products: products.length,
-    total_users: 0, // Can't calculate without users endpoint
+    total_users: usersData.length,
     delivered_orders: orders.filter(o => o.status?.toLowerCase() === "delivered").length,
     pending_orders: orders.filter(o => o.status?.toLowerCase() === "pending").length,
     processing_orders: orders.filter(o => o.status?.toLowerCase() === "processing").length,
     shipped_orders: orders.filter(o => o.status?.toLowerCase() === "shipped").length,
     cancelled_orders: orders.filter(o => o.status?.toLowerCase() === "cancelled").length,
     low_stock_products: products.filter(p => (p.stock_quantity ?? 0) < 10).length,
-  };
+  }, [orders, products, usersData, statsData]);
 
-  const isLoading = loadingStats || loadingProducts || loadingOrders;
+  const isLoading = loadingStats || loadingProducts || loadingOrders || loadingUsers;
+  const isRefreshing = fetchingStats || fetchingProducts || fetchingOrders;
+
+  const handleRefresh = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
+    queryClient.invalidateQueries({ queryKey: ["admin-users-count"] });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+    await Promise.allSettled([refetchStats(), refetchOrders(), refetchProducts(), refetchUsers()]);
+  }, [queryClient, refetchOrders, refetchProducts, refetchStats, refetchUsers]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
@@ -109,17 +125,12 @@ const AdminDashboard = () => {
         </div>
         <Button
           variant="outline"
-          onClick={() => {
-            console.log("🔄 Refreshing dashboard stats...");
-            queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
-            queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
-            queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
-          }}
+          onClick={handleRefresh}
           className="flex items-center gap-2"
-          disabled={isLoading}
+          disabled={isRefreshing}
         >
-          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-          Refresh
+          <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+          {isRefreshing ? "Refreshing" : "Refresh"}
         </Button>
       </div>
 
@@ -305,7 +316,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Management Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-lg transition-shadow">
           <CardContent className="flex flex-col items-center py-12 gap-4">
             <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -339,9 +350,26 @@ const AdminDashboard = () => {
             </Link>
           </CardContent>
         </Card>
+
+        <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-lg transition-shadow">
+          <CardContent className="flex flex-col items-center py-12 gap-4">
+            <div className="h-16 w-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+              <Users size={32} className="text-purple-600 dark:text-purple-400" />
+            </div>
+            <div className="text-center">
+              <p className="font-bold text-xl text-gray-900 dark:text-white mb-1">User Management</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Review customers, admins, and account access.
+              </p>
+            </div>
+            <Link to="/admin/users">
+              <Button size="lg" variant="outline" className="mt-2">Manage Users</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 };
 
-export default AdminDashboard;
+export default React.memo(AdminDashboard);

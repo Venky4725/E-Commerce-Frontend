@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/api";
 import { Card, CardContent } from "../components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { ShoppingCart, Loader2, PackageOpen, Trash2, Plus, Minus } from "lucide-react";
 import { useToast } from "../components/ui/toast";
 import useAuthStore from "../store/authStore";
+import { buildAssetUrl } from "../api/endpoints";
 
 const Cart = () => {
   const [items, setItems] = useState([]);   // enriched items: { product_id, quantity, product }
@@ -58,7 +59,7 @@ const Cart = () => {
     setPending((prev) => ({ ...prev, [productId]: value }));
 
   // ── Update quantity ──────────────────────────────────────────────────────────
-  const handleUpdateQuantity = async (productId, newQty) => {
+  const handleUpdateQuantity = useCallback(async (productId, newQty) => {
     // Quantity floor is 1
     if (newQty < 1) return;
 
@@ -101,10 +102,10 @@ const Cart = () => {
     } finally {
       setPendingFor(productId, false);
     }
-  };
+  }, [items, toast]);
 
   // ── Remove item ──────────────────────────────────────────────────────────────
-  const handleRemove = async (productId) => {
+  const handleRemove = useCallback(async (productId) => {
     // Optimistic UI — remove immediately
     const previousItems = items;
     setItems((prev) => prev.filter((item) => item.product_id !== productId));
@@ -124,7 +125,7 @@ const Cart = () => {
     } finally {
       setPendingFor(productId, false);
     }
-  };
+  }, [items, toast]);
 
   // ── Total ────────────────────────────────────────────────────────────────────
   const total = items.reduce((sum, item) => {
@@ -196,7 +197,7 @@ const Cart = () => {
             const quantity   = item.quantity ?? 1;
             const atStockLimit = stock !== null && quantity >= stock;
             const imageUrl   = item.product?.image_url
-              ? `http://127.0.0.1:8000${item.product.image_url}`
+              ? buildAssetUrl(item.product.image_url)
               : null;
             const isBusy = !!pending[productId];
 

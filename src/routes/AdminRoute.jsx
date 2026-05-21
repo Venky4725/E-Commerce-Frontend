@@ -1,35 +1,23 @@
 import React from "react";
 import { Navigate, Outlet } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import useAuthStore from "../store/authStore";
 
-/**
- * AdminRoute Component
- * Demonstrates: Protected routes, conditional rendering, React Router
- * Use case: Restrict access to admin-only pages
- * 
- * Checks:
- * 1. User is authenticated (has token)
- * 2. User has admin privileges (is_admin === true OR email === "admin@gmail.com")
- */
 const AdminRoute = () => {
-  const { token, user } = useAuthStore();
+  const { token, user, isHydrated } = useAuthStore();
 
-  // Check if user is authenticated
-  if (!token) {
-    console.log("🚫 AdminRoute: No token, redirecting to login");
-    return <Navigate to="/login" replace />;
+  if (!isHydrated) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-blue-500" />
+      </div>
+    );
   }
 
-  // Check if user is admin
+  if (!token) return <Navigate to="/login" replace />;
+
   const isAdmin = user?.is_admin === true || user?.email === "admin@gmail.com";
-  
-  if (!isAdmin) {
-    console.log("🚫 AdminRoute: User is not admin, redirecting to home");
-    return <Navigate to="/" replace />;
-  }
-
-  console.log("✅ AdminRoute: Access granted");
-  return <Outlet />;
+  return isAdmin ? <Outlet /> : <Navigate to="/" replace />;
 };
 
 export default AdminRoute;

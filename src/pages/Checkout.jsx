@@ -10,6 +10,9 @@ import { Button } from "../components/ui/button";
 import { useToast } from "../components/ui/toast";
 import { Loader2, ShoppingBag } from "lucide-react";
 import { extractErrorMessage, logError } from "../lib/errorUtils";
+import { buildAssetUrl } from "../api/endpoints";
+import { useTaskPolling } from "../hooks/useTask";
+import { TaskProgress } from "../components/TaskProgress";
 
 const checkoutSchema = z.object({
   full_name:    z.string().min(2, "Full name is required"),
@@ -25,10 +28,27 @@ const Checkout = () => {
   const [cartItems, setCartItems] = useState([]);
   const [loadingCart, setLoadingCart] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [emailTaskId, setEmailTaskId] = useState(null);
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(checkoutSchema),
   });
+
+  const { data: emailTask } = useTaskPolling(emailTaskId);
+
+  // Check email task status
+  useEffect(() => {
+    if (!emailTask) return;
+    const status = emailTask.status?.toLowerCase();
+    if (status === "completed" || status === "success") {
+      toast({ title: "Email sent!", description: "Check your inbox for confirmation." });
+      // Redirect after a small delay to let user see success
+      setTimeout(() => navigate("/orders"), 2000);
+    } else if (status === "failed" || status === "error") {
+      toast({ title: "Email failed", description: "Your order is placed, but email failed.", variant: "destructive" });
+      setTimeout(() => navigate("/orders"), 3000);
+    }
+  }, [emailTask, navigate, toast]);
 
   // Load cart + product details
   useEffect(() => {
@@ -54,7 +74,7 @@ const Checkout = () => {
       }
     };
     load();
-  }, []);
+  }, [toast]);
 
   const total = cartItems.reduce(
     (sum, item) => sum + (item.product?.price ?? 0) * (item.quantity ?? 1),
@@ -70,41 +90,25 @@ const Checkout = () => {
     setSubmitting(true);
     
     try {
-      // Build order payload
       const payload = {
         shipping_address: `${data.full_name}, ${data.address}, ${data.city} - ${data.postal_code}`,
         phone: data.phone,
       };
       
-      // 🐛 DEBUG: Log payload before sending
-      console.log("📦 ORDER PAYLOAD:", JSON.stringify(payload, null, 2));
-      
-      // Send order request
       const response = await api.post("/orders/", payload);
       
-      // 🐛 DEBUG: Log success response
-      console.log("✅ ORDER SUCCESS:", response.data);
-      
-      toast({ 
-        title: "Order placed!", 
-        description: "Thank you for your purchase." 
-      });
-      
-      navigate("/orders");
+      // Assume backend returns email_task_id
+      if (response.data?.email_task_id) {
+        setEmailTaskId(response.data.email_task_id);
+      } else {
+        toast({ title: "Order placed!", description: "Thank you for your purchase." });
+        navigate("/orders");
+      }
       
     } catch (err) {
-      // 🐛 DEBUG: Log full error with context
       logError("ORDER CREATION", err);
-      
-      // Extract safe error message
       const errorMessage = extractErrorMessage(err, "Failed to place order. Please try again.");
-      
-      toast({
-        title: "Order failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
+      toast({ title: "Order failed", description: errorMessage, variant: "destructive" });
       setSubmitting(false);
     }
   };
@@ -167,6 +171,12 @@ const Checkout = () => {
                   )}
                 </Button>
               </form>
+
+              {emailTaskId && (
+                <div className="mt-6">
+                  <TaskProgress task={emailTask} label="Sending Confirmation Email" />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -187,7 +197,7 @@ const Checkout = () => {
                     const price = item.product?.price ?? 0;
                     const qty   = item.quantity ?? 1;
                     const img   = item.product?.image_url
-                      ? `http://127.0.0.1:8000${item.product.image_url}`
+                      ? buildAssetUrl(item.product.image_url)
                       : null;
 
                     return (

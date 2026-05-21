@@ -15,7 +15,7 @@ import ProductCardSkeleton from "./ProductCardSkeleton";
 // Lazy load ProductCard for code splitting demonstration
 const ProductCard = lazy(() => import("./ProductCard"));
 
-const ProductGrid = ({ products, onAddToCart, isLoading = false, emptyMessage = "No products found" }) => {
+const ProductGrid = ({ products, onAddToCart, isLoading = false, emptyMessage = "No products found", highlight = "" }) => {
   // Loading state
   if (isLoading) {
     return (
@@ -65,6 +65,7 @@ const ProductGrid = ({ products, onAddToCart, isLoading = false, emptyMessage = 
             product={product}
             onAddToCart={onAddToCart}
             showActions={true}
+            highlight={highlight}
           />
         </Suspense>
       ))}
@@ -72,4 +73,4 @@ const ProductGrid = ({ products, onAddToCart, isLoading = false, emptyMessage = 
   );
 };
 
-export default ProductGrid;
+export default React.memo(ProductGrid);

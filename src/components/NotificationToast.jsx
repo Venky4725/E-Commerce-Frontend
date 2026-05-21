@@ -1,33 +1,28 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, memo } from "react";
 import { X, Package, CheckCircle, AlertCircle, ShoppingBag, Truck } from "lucide-react";
 import useNotificationStore from "../store/notificationStore";
 
 const NotificationToast = () => {
   const [toasts, setToasts] = useState([]);
+  const shownIdsRef = useRef(new Set());
   const { notifications } = useNotificationStore();
 
   useEffect(() => {
-    // Get the latest notification
-    if (notifications.length > 0) {
-      const latestNotification = notifications[0];
-      
-      // Only show toast for new unread notifications
-      if (!latestNotification.read && !latestNotification.toastShown) {
-        // Add to toasts
-        setToasts((prev) => {
-          // Check if this notification is already in toasts
-          if (prev.some(t => t.id === latestNotification.id)) {
-            return prev;
-          }
-          return [...prev, { ...latestNotification, toastShown: true }];
-        });
+    if (notifications.length === 0) return;
 
-        // Auto-remove after 5 seconds
-        setTimeout(() => {
-          setToasts((prev) => prev.filter((t) => t.id !== latestNotification.id));
-        }, 5000);
-      }
-    }
+    const latestNotification = notifications[0];
+    if (!latestNotification.id || latestNotification.read) return;
+
+    if (shownIdsRef.current.has(String(latestNotification.id))) return;
+
+    shownIdsRef.current.add(String(latestNotification.id));
+    setToasts((prev) => [...prev, latestNotification]);
+
+    const timeoutId = window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => String(t.id) !== String(latestNotification.id)));
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
   }, [notifications]);
 
   const getNotificationIcon = (type) => {
@@ -103,4 +98,4 @@ const NotificationToast = () => {
   );
 };
 
-export default NotificationToast;
+export default React.memo(NotificationToast);

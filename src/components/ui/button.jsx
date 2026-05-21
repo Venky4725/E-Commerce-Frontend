@@ -29,7 +29,7 @@ const buttonVariants = cva(
   }
 );
 
-const Button = React.forwardRef(
+const Button = React.memo(React.forwardRef(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return (
@@ -40,7 +40,7 @@ const Button = React.forwardRef(
       />
     );
   }
-);
+));
 Button.displayName = "Button";
 
 export { Button, buttonVariants };

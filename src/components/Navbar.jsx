@@ -1,40 +1,26 @@
 import React, { useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
-import { ShoppingCart, User, LogOut, Menu, X, Store, Moon, Sun, ClipboardList, LayoutDashboard, Package } from "lucide-react";
+import { Link, NavLink } from "react-router-dom";
+import { ShoppingCart, User, LogOut, Menu, X, Store, Moon, Sun, ClipboardList, LayoutDashboard, Package, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
 import useAuthStore from "../store/authStore";
 import useThemeStore from "../store/themeStore";
-import useNotificationStore from "../store/notificationStore";
 import NotificationBell from "./NotificationBell";
-import { useQueryClient } from "@tanstack/react-query";
+import { useLogout } from "../hooks/useAuth";
+import { useWebSocketContext } from "../websocket/WebSocketProvider";
 
 const Navbar = () => {
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const { token, user, logout } = useAuthStore();
+  const { token, user } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
-  const { clearAllNotifications } = useNotificationStore();
+  const performLogout = useLogout();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { connectionState } = useWebSocketContext();
 
   const handleLogout = () => {
-    console.log("🚪 Logout button clicked");
-    
-    // 1. Clear notifications for this user
-    clearAllNotifications();
-    console.log("✅ Notifications cleared");
-    
-    // 2. Clear React Query cache
-    queryClient.clear();
-    console.log("✅ React Query cache cleared");
-    
-    // 3. Clear auth store (also clears localStorage)
-    logout();
-    console.log("✅ Auth store cleared");
-    
-    // 4. Navigate to login
-    navigate("/login");
-    console.log("✅ Navigated to login");
+    performLogout();
   };
+
+  const isConnected = connectionState === "connected";
+  const isConnecting = connectionState === "connecting" || connectionState === "reconnecting";
 
   const navLinkClass = ({ isActive }) =>
     isActive
@@ -50,14 +36,39 @@ const Navbar = () => {
         <div className="flex items-center justify-between h-16">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl text-gray-900 dark:text-white">
-            <Store size={22} className="text-blue-600 dark:text-blue-400" />
-            ShopKart
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link to="/" className="flex items-center gap-2 font-bold text-xl text-gray-900 dark:text-white">
+              <Store size={22} className="text-blue-600 dark:text-blue-400" />
+              ShopKart
+            </Link>
+            
+            {/* WS Indicator */}
+            {token && (
+              <div 
+                className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                  isConnected 
+                    ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800" 
+                    : isConnecting
+                      ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
+                      : "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800"
+                }`}
+                title={`WebSocket: ${connectionState}`}
+              >
+                {isConnecting ? (
+                  <RefreshCw size={10} className="animate-spin" />
+                ) : isConnected ? (
+                  <Wifi size={10} />
+                ) : (
+                  <WifiOff size={10} />
+                )}
+                <span className="hidden sm:inline capitalize">{connectionState}</span>
+              </div>
+            )}
+          </div>
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-5">
-            <NavLink to="/" className={navLinkClass} end>
+            <NavLink to="/" className={navLinkClass} end aria-label="Home">
               Home
             </NavLink>
 
@@ -66,25 +77,31 @@ const Navbar = () => {
                 {isAdmin ? (
                   // Admin navigation
                   <>
-                    <NavLink to="/admin" className={navLinkClass} end>
+                    <NavLink to="/admin" className={navLinkClass} end aria-label="Admin Dashboard">
                       <span className="flex items-center gap-1">
                         <LayoutDashboard size={15} /> Dashboard
                       </span>
                     </NavLink>
 
-                    <NavLink to="/admin/products" className={navLinkClass}>
+                    <NavLink to="/admin/products" className={navLinkClass} aria-label="Manage Products">
                       <span className="flex items-center gap-1">
                         <Package size={15} /> Products
                       </span>
                     </NavLink>
 
-                    <NavLink to="/admin/orders" className={navLinkClass}>
+                    <NavLink to="/admin/orders" className={navLinkClass} aria-label="Manage Orders">
                       <span className="flex items-center gap-1">
                         <ClipboardList size={15} /> Manage Orders
                       </span>
                     </NavLink>
 
-                    <NavLink to="/profile" className={navLinkClass}>
+                    <NavLink to="/admin/users" className={navLinkClass} aria-label="Manage Users">
+                      <span className="flex items-center gap-1">
+                        <User size={15} /> Users
+                      </span>
+                    </NavLink>
+
+                    <NavLink to="/profile" className={navLinkClass} aria-label="My Profile">
                       <span className="flex items-center gap-1">
                         <User size={15} />
                         {user?.username || "Profile"}
@@ -94,19 +111,19 @@ const Navbar = () => {
                 ) : (
                   // Regular user navigation
                   <>
-                    <NavLink to="/cart" className={navLinkClass}>
+                    <NavLink to="/cart" className={navLinkClass} aria-label="Shopping Cart">
                       <span className="flex items-center gap-1">
                         <ShoppingCart size={15} /> Cart
                       </span>
                     </NavLink>
 
-                    <NavLink to="/orders" className={navLinkClass}>
+                    <NavLink to="/orders" className={navLinkClass} aria-label="My Orders">
                       <span className="flex items-center gap-1">
                         <ClipboardList size={15} /> Orders
                       </span>
                     </NavLink>
 
-                    <NavLink to="/profile" className={navLinkClass}>
+                    <NavLink to="/profile" className={navLinkClass} aria-label="My Profile">
                       <span className="flex items-center gap-1">
                         <User size={15} />
                         {user?.username || "Profile"}
@@ -122,6 +139,7 @@ const Navbar = () => {
                   variant="ghost"
                   size="sm"
                   onClick={handleLogout}
+                  aria-label="Logout"
                   className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
                 >
                   <LogOut size={15} /> Logout
@@ -129,8 +147,8 @@ const Navbar = () => {
               </>
             ) : (
               <>
-                <NavLink to="/login" className={navLinkClass}>Login</NavLink>
-                <Link to="/register">
+                <NavLink to="/login" className={navLinkClass} aria-label="Login">Login</NavLink>
+                <Link to="/register" aria-label="Register">
                   <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">Register</Button>
                 </Link>
               </>
@@ -175,6 +193,7 @@ const Navbar = () => {
                   <NavLink to="/admin" className={navLinkClass} end onClick={() => setMenuOpen(false)}>Dashboard</NavLink>
                   <NavLink to="/admin/products" className={navLinkClass} onClick={() => setMenuOpen(false)}>Products</NavLink>
                   <NavLink to="/admin/orders" className={navLinkClass} onClick={() => setMenuOpen(false)}>Manage Orders</NavLink>
+                  <NavLink to="/admin/users" className={navLinkClass} onClick={() => setMenuOpen(false)}>Users</NavLink>
                   <NavLink to="/profile" className={navLinkClass} onClick={() => setMenuOpen(false)}>Profile</NavLink>
                 </>
               ) : (

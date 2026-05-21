@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useProfile } from "../hooks/useProfile";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -42,34 +42,25 @@ const Profile = () => {
   // Update profile mutation
   const updateMutation = useMutation({
     mutationFn: async (data) => {
-      console.log("📝 Updating profile with data:", data);
-      
       // Try PUT first, fallback to PATCH if 405
       try {
         const res = await api.put("/me", data);
-        console.log("✅ Profile updated with PUT:", res.data);
         return res.data;
       } catch (err) {
         if (err.response?.status === 405) {
-          console.log("⚠️ PUT not allowed, trying PATCH...");
           const res = await api.patch("/me", data);
-          console.log("✅ Profile updated with PATCH:", res.data);
           return res.data;
         }
         throw err;
       }
     },
     onSuccess: (updatedUser) => {
-      console.log("✅ Profile update successful:", updatedUser);
-      
       // 1. Update Zustand auth store with new user data
       const { setAuth, token } = useAuthStore.getState();
       setAuth(token, updatedUser);
-      console.log("✅ Auth store updated with new user data");
       
-      // 2. Invalidate profile query to refetch
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      console.log("✅ Profile query invalidated");
+      // 2. Invalidate session query to refetch
+      queryClient.invalidateQueries({ queryKey: ["session"] });
       
       // 3. Show success toast
       toast({ 
@@ -439,4 +430,4 @@ const Profile = () => {
   );
 };
 
-export default Profile;
+export default React.memo(Profile);

@@ -1,49 +1,117 @@
 import axios from "axios";
+import { API_URL } from "./endpoints";
+import useAuthStore from "../store/authStore";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000/api/v1",
+  baseURL: API_URL,
+  timeout: 20000,
 });
 
-// Attach JWT token to every request
+let refreshPromise = null;
+let toastHandler = null;
+
+export const setApiToastHandler = (handler) => {
+  toastHandler = handler;
+};
+
+const showGlobalError = (error) => {
+  if (!toastHandler || error.config?.silent) return;
+
+  const status = error.response?.status;
+  const data = error.response?.data;
+  
+  // Handle 401 separately (usually handled by interceptor or login page)
+  if (status === 401) return;
+
+  if (!status || status >= 500) {
+    toastHandler({
+      title: "Connection problem",
+      description: "The server did not respond as expected. Please try again.",
+      variant: "destructive",
+    });
+  } else if (status >= 400 && status < 500) {
+    // Show backend-provided error message if available
+    const message = data?.detail || data?.message || "An error occurred with your request.";
+    toastHandler({
+      title: "Request error",
+      description: message,
+      variant: "destructive",
+    });
+  }
+};
+
+const getStoredToken = () => {
+  const stateToken = useAuthStore.getState().token;
+  const storageToken = localStorage.getItem("access_token");
+  if (!stateToken && storageToken) {
+    const refreshToken = localStorage.getItem("refresh_token");
+    useAuthStore.getState().updateToken(storageToken, refreshToken);
+    return storageToken;
+  }
+  return stateToken || storageToken;
+};
+
 api.interceptors.request.use(
   (config) => {
-    // Read from localStorage
-    const token = localStorage.getItem("access_token");
+    const token = getStoredToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log("🔑 Token attached to", config.url, ":", token.substring(0, 20) + "...");
-    } else {
-      console.log("⚠️ No token found in localStorage for", config.url);
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Handle 401 — clear auth and redirect
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const url = error.config?.url || "";
-    
-    if (error.response?.status === 401) {
-      console.log("🚫 401 Unauthorized on", url);
-      
-      // Skip auto-logout for login/register routes
-      if (url.includes("/login") || url.includes("/register")) {
-        console.log("⏭️ Skipping auto-logout for auth route");
-        return Promise.reject(error);
-      }
-      
-      // Clear auth and redirect
-      console.log("🧹 Clearing auth and redirecting to login");
-      localStorage.removeItem("access_token");
-      
-      // Only redirect if not already on login page
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
+  async (error) => {
+    const originalRequest = error.config || {};
+    const url = originalRequest.url || "";
+
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !originalRequest.skipAuthRefresh &&
+      !url.includes("/login") &&
+      !url.includes("/register")
+    ) {
+      originalRequest._retry = true;
+      try {
+        const refreshToken =
+          useAuthStore.getState().refreshToken || localStorage.getItem("refresh_token");
+        if (!refreshToken) throw new Error("No refresh token available.");
+
+        refreshPromise =
+          refreshPromise ||
+          axios.post(`${API_URL}/refresh`, { refresh_token: refreshToken }, { timeout: 20000 });
+        const refreshResponse = await refreshPromise;
+        const accessToken =
+          refreshResponse.data.access_token ||
+          refreshResponse.data.accessToken ||
+          refreshResponse.data.token;
+        const nextRefreshToken =
+          refreshResponse.data.refresh_token ||
+          refreshResponse.data.refreshToken ||
+          refreshToken;
+        if (!accessToken) throw new Error("Refresh response did not include an access token.");
+        useAuthStore.getState().updateToken(accessToken, nextRefreshToken);
+        refreshPromise = null;
+        originalRequest.headers = {
+          ...originalRequest.headers,
+          Authorization: `Bearer ${accessToken}`,
+        };
+        return api(originalRequest);
+      } catch (refreshError) {
+        refreshPromise = null;
+        useAuthStore.getState().logout("expired");
+        if (!window.location.pathname.includes("/login")) {
+          window.location.assign("/login?expired=1");
+        }
+        return Promise.reject(refreshError);
       }
     }
+
+    showGlobalError(error);
     return Promise.reject(error);
   }
 );

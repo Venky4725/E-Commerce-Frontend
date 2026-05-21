@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useProduct } from "../hooks/useProducts";
 import { Button } from "../components/ui/button";
@@ -7,6 +7,7 @@ import { useToast } from "../components/ui/toast";
 import { ShoppingCart, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import api from "../api/api";
 import useAuthStore from "../store/authStore";
+import { buildAssetUrl } from "../api/endpoints";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -18,7 +19,7 @@ const ProductDetail = () => {
   // React Query
   const { data: product, isLoading, isError, refetch } = useProduct(id);
 
-  const handleAddToCart = async () => {
+  const handleAddToCart = useCallback(async () => {
     if (!token) {
       toast({ title: "Please login first", variant: "destructive" });
       navigate("/login");
@@ -41,7 +42,7 @@ const ProductDetail = () => {
     } finally {
       setAddingToCart(false);
     }
-  };
+  }, [token, product?.id, product?.name, navigate, toast]);
 
   if (isLoading) {
     return (
@@ -67,9 +68,8 @@ const ProductDetail = () => {
     );
   }
 
-  const imageUrl = product.image_url
-    ? `http://127.0.0.1:8000${product.image_url}`
-    : "https://placehold.co/600x400?text=No+Image";
+  const imageUrl = product.image_url ? buildAssetUrl(product.image_url) : null;
+
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -85,15 +85,25 @@ const ProductDetail = () => {
         <CardContent className="p-0">
           <div className="flex flex-col md:flex-row">
             {/* Image */}
-            <div className="md:w-1/2 bg-gray-50 dark:bg-gray-700 rounded-t-xl md:rounded-l-xl md:rounded-tr-none flex items-center justify-center p-8 min-h-72">
-              <img
-                src={imageUrl}
-                alt={product.name}
-                className="max-h-80 w-full object-contain"
-                onError={(e) => {
-                  e.target.src = "https://placehold.co/600x400?text=No+Image";
-                }}
-              />
+            <div className="md:w-1/2 bg-gray-50 dark:bg-gray-700 rounded-t-xl md:rounded-l-xl md:rounded-tr-none flex items-center justify-center p-8 aspect-square md:aspect-auto min-h-72">
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={product.name}
+                  loading="eager"
+                  decoding="async"
+                  className="max-h-80 w-full object-contain"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+              ) : (
+                <div className="flex w-full aspect-square items-center justify-center text-sm text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-t-xl md:rounded-l-xl md:rounded-tr-none">
+                  <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E" alt="No image available" className="max-h-80 w-full object-contain opacity-50 grayscale" loading="lazy" />
+                </div>
+              )}
+
             </div>
 
             {/* Details */}

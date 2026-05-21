@@ -5,50 +5,62 @@ const useAuthStore = create(
   persist(
     (set, get) => ({
       token: null,
+      refreshToken: null,
       user: null,
       isHydrated: false,
+      logoutReason: null,
 
-      setAuth: (token, user) => {
-        console.log("🔐 setAuth called:", { token: token?.substring(0, 20) + "...", user: user?.username });
-        
-        // Sync to localStorage for axios interceptor
-        localStorage.setItem("access_token", token);
-        
-        // Update Zustand state
-        set({ token, user, isHydrated: true });
-        
-        console.log("✅ Auth state updated in Zustand");
+      setAuth: (token, user, refreshToken = get().refreshToken) => {
+        if (token) localStorage.setItem("access_token", token);
+        if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+        set({
+          token,
+          refreshToken: refreshToken ?? null,
+          user,
+          isHydrated: true,
+          logoutReason: null,
+        });
       },
 
-      logout: () => {
-        console.log("🚪 Logout initiated - clearing all auth state");
-        
-        // Clear localStorage
+      updateToken: (token, refreshToken = get().refreshToken) => {
+        if (token) localStorage.setItem("access_token", token);
+        if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+        set({ token, refreshToken: refreshToken ?? null, isHydrated: true });
+      },
+
+      setUser: (user) => set({ user, isHydrated: true }),
+
+      logout: (reason = "manual") => {
         localStorage.removeItem("access_token");
-        console.log("✅ Cleared localStorage");
-        
-        // Clear Zustand state
-        set({ token: null, user: null, isHydrated: false });
-        console.log("✅ Cleared Zustand state");
+        localStorage.removeItem("refresh_token");
+        set({
+          token: null,
+          refreshToken: null,
+          user: null,
+          isHydrated: true,
+          logoutReason: reason,
+        });
       },
 
-      // Helper to check if user is admin
       isAdmin: () => {
         const state = get();
         return state.user?.is_admin === true || state.user?.email === "admin@gmail.com";
       },
 
-      // Mark as hydrated after initial load
-      setHydrated: () => {
-        set({ isHydrated: true });
-      },
+      setHydrated: () => set({ isHydrated: true }),
     }),
     {
       name: "auth-storage",
+      partialize: (state) => ({
+        token: state.token,
+        refreshToken: state.refreshToken,
+        user: state.user,
+      }),
       onRehydrateStorage: () => (state) => {
-        console.log("🔄 Auth store rehydrated from localStorage");
         if (state) {
           state.isHydrated = true;
+          if (state.token) localStorage.setItem("access_token", state.token);
+          if (state.refreshToken) localStorage.setItem("refresh_token", state.refreshToken);
         }
       },
     }
