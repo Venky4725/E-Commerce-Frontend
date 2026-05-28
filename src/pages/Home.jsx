@@ -3,9 +3,11 @@ import ProductCard from "../components/ProductCard";
 import ProductCardSkeleton from "../components/ProductCardSkeleton";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
-import { Search, ArrowUpDown, SlidersHorizontal, RefreshCw, X } from "lucide-react";
+import { Search, ArrowUpDown, SlidersHorizontal, RefreshCw, X, Sparkles } from "lucide-react";
 import { useSearchProducts } from "../hooks/useSearchProducts";
 import { HighlightText } from "../components/HighlightText";
+
+const FALLBACK_CATEGORIES = ["Electronics", "Furniture", "Beauty", "Groceries", "Toys"];
 
 const PRICE_RANGES = [
   { label: "All Prices", value: "all" },
@@ -18,6 +20,7 @@ const Home = () => {
   const [search, setSearch] = useState("");
   const [priceRange, setPriceRange] = useState("all");
   const [sortOrder, setSortOrder] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const searchRef = useRef(null);
@@ -61,8 +64,18 @@ const Home = () => {
     }
   };
 
+  const categoryOptions = useMemo(() => {
+    const unique = Array.from(new Set(["All", ...FALLBACK_CATEGORIES, ...(products || []).map((product) => product.category).filter(Boolean)]));
+    return unique;
+  }, [products]);
+
   const displayProducts = useMemo(() => {
-    const afterPrice = products.filter((product) => {
+    const afterCategory = (products || []).filter((product) => {
+      if (activeCategory === "All") return true;
+      return (product.category || "General").toLowerCase() === activeCategory.toLowerCase();
+    });
+
+    const afterPrice = afterCategory.filter((product) => {
       if (priceRange === "0-100") return product.price <= 100;
       if (priceRange === "100-1000") return product.price > 100 && product.price <= 1000;
       if (priceRange === "1000+") return product.price > 1000;
@@ -74,7 +87,7 @@ const Home = () => {
       if (sortOrder === "desc") return b.price - a.price;
       return 0;
     });
-  }, [products, priceRange, sortOrder]);
+  }, [products, priceRange, sortOrder, activeCategory]);
 
   const toggleSort = useCallback((order) => {
     setSortOrder((prev) => (prev === order ? "" : order));
@@ -84,18 +97,46 @@ const Home = () => {
     setSearch("");
     setPriceRange("all");
     setSortOrder("");
+    setActiveCategory("All");
     setShowSuggestions(false);
   }, []);
 
-  const hasActiveFilters = search || priceRange !== "all" || sortOrder;
+  const hasActiveFilters = search || priceRange !== "all" || sortOrder || activeCategory !== "All";
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">All Products</h1>
-        <p className="mt-1 text-gray-600 dark:text-gray-400">
-          {isLoading ? "Loading..." : `${displayProducts.length} product${displayProducts.length !== 1 ? "s" : ""} found`}
-        </p>
+      <div className="mb-8 rounded-3xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-800 dark:bg-gray-900/80">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl space-y-3">
+            <p className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-blue-700 dark:bg-blue-950/60 dark:text-blue-200">
+              <Sparkles size={12} /> ShopKart storefront
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">Browse trending products and categories</h1>
+            <p className="text-gray-600 dark:text-gray-300">
+              {isLoading ? "Loading..." : `${displayProducts.length} product${displayProducts.length !== 1 ? "s" : ""} found across curated collections.`}
+            </p>
+          </div>
+          <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-800 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-100">
+            Search, filter, and explore categories without losing the AI shopping flow.
+          </div>
+        </div>
+      </div>
+
+      <div className="mb-6 flex flex-wrap gap-2">
+        {categoryOptions.map((category) => (
+          <button
+            key={category}
+            type="button"
+            onClick={() => setActiveCategory(category)}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+              activeCategory === category
+                ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                : "border-gray-200 bg-white text-gray-700 hover:border-blue-200 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:border-blue-900 dark:hover:bg-blue-950/60"
+            }`}
+          >
+            {category}
+          </button>
+        ))}
       </div>
 
       <div className="mb-8 flex flex-col gap-3 sm:flex-row">

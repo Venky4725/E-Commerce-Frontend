@@ -13,9 +13,9 @@ import { buildAssetUrl } from "../../api/endpoints";
 import BulkUploadModal from "../../components/BulkUploadModal";
 
 const productSchema = z.object({
-  name:           z.string().min(1, "Name is required"),
-  description:    z.string().optional(),
-  price:          z.coerce.number().positive("Price must be positive"),
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+  price: z.coerce.number().positive("Price must be positive"),
   stock_quantity: z.coerce.number().int().min(0, "Stock cannot be negative"),
 });
 
@@ -35,14 +35,11 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
     try {
       let res;
       if (initial?.id) {
-        // Edit
         res = await api.put(`/products/${initial.id}`, data);
       } else {
-        // Create
         res = await api.post("/products/", data);
       }
 
-      // Upload image if selected
       if (imageFile && res.data?.id) {
         const form = new FormData();
         form.append("file", imageFile);
@@ -69,10 +66,13 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
       <Card className="w-full max-w-lg dark:bg-gray-800 dark:border-gray-700">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="dark:text-white">
-              {initial?.id ? "Edit Product" : "New Product"}
-            </CardTitle>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <CardTitle className="dark:text-white">{initial?.id ? "Edit Product" : "New Product"}</CardTitle>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              type="button"
+              aria-label="Close"
+            >
               <X size={20} />
             </button>
           </div>
@@ -80,13 +80,13 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
             {[
-              { id: "name",           label: "Product Name",  placeholder: "e.g. Wireless Headphones", type: "text" },
-              { id: "description",    label: "Description",   placeholder: "Optional description",      type: "text" },
-              { id: "price",          label: "Price (₹)",     placeholder: "e.g. 499",                  type: "number" },
-              { id: "stock_quantity", label: "Stock Quantity", placeholder: "e.g. 50",                  type: "number" },
+              { id: "name", label: "Product Name", placeholder: "e.g. Wireless Headphones", type: "text" },
+              { id: "description", label: "Description", placeholder: "Optional description", type: "text" },
+              { id: "price", label: "Price (₹)", placeholder: "e.g. 499", type: "number" },
+              { id: "stock_quantity", label: "Stock Quantity", placeholder: "e.g. 50", type: "number" },
             ].map(({ id, label, placeholder, type }) => (
               <div key={id}>
-                <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
                   {label}
                 </label>
                 <Input
@@ -97,16 +97,15 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
                   {...register(id)}
                 />
                 {errors[id] && (
-                  <p className="mt-1 text-xs text-red-500" role="alert">{errors[id].message}</p>
+                  <p className="mt-1 text-xs text-red-500" role="alert">
+                    {errors[id].message}
+                  </p>
                 )}
               </div>
             ))}
 
-            {/* Image upload */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Product Image
-              </label>
+              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Product Image</label>
               <input
                 type="file"
                 accept="image/*"
@@ -117,7 +116,7 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
 
             <div className="flex gap-3 pt-2">
               <Button type="submit" className="flex-1" disabled={saving}>
-                {saving ? <Loader2 size={16} className="animate-spin" /> : (initial?.id ? "Save Changes" : "Create Product")}
+                {saving ? <Loader2 size={16} className="animate-spin" /> : initial?.id ? "Save Changes" : "Create Product"}
               </Button>
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                 Cancel
@@ -130,21 +129,25 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
   );
 };
 
-// ── Main page ────────────────────────────────────────────────────────────────
 const AdminProducts = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
   const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null); // product to edit
+  const [editing, setEditing] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const { data: products = [], isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const res = await api.get("/products/?skip=0&limit=100");
+      const res = await api.get("/products/?skip=0&limit=1000");
       return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
     },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     retry: 1,
@@ -155,29 +158,46 @@ const AdminProducts = () => {
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ["products"] });
       const previousProducts = queryClient.getQueryData(["products"]);
-      queryClient.setQueryData(["products"], (current = []) =>
-        current.filter((product) => product.id !== id)
-      );
+      queryClient.setQueryData(["products"], (current = []) => current.filter((p) => String(p.id) !== String(id)));
       return { previousProducts };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["admin-products-count"] });
+      setDeletingId(null);
       toast({ title: "Product deleted" });
     },
     onError: (err, _id, context) => {
       queryClient.setQueryData(["products"], context?.previousProducts || []);
+      setDeletingId(null);
+
+      const status = err.response?.status;
+      const detail = err.response?.data?.detail || err.response?.data?.message || "";
+
+      if (status === 404 || String(detail).toLowerCase().includes("not found")) {
+        toast({ title: "Product already deleted", description: "The product was already removed.", variant: "default" });
+        return;
+      }
+
       toast({
         title: "Delete failed",
-        description: err.response?.data?.detail || "Try again",
+        description: detail || "Try again",
         variant: "destructive",
       });
     },
   });
 
-  const handleDelete = (product) => {
-    if (!window.confirm(`Delete "${product.name}"?`)) return;
-    deleteMutation.mutate(product.id);
+  const requestDelete = (product) => {
+    if (deletingId && String(deletingId) === String(product.id)) return;
+    setConfirmTarget(product);
+    setConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (!confirmTarget?.id) return;
+    setConfirmOpen(false);
+    setDeletingId(confirmTarget.id);
+    deleteMutation.mutate(confirmTarget.id);
   };
 
   const handleSaved = () => {
@@ -193,10 +213,11 @@ const AdminProducts = () => {
     await refetch();
   };
 
+  const deleteLoading = deleteMutation.isPending;
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="mb-6 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Products</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={handleRefresh} disabled={isFetching} className="flex items-center gap-2">
@@ -219,8 +240,8 @@ const AdminProducts = () => {
       )}
 
       {isError && (
-        <div className="text-center py-20">
-          <p className="text-red-500 mb-4">Failed to load products.</p>
+        <div className="py-20 text-center">
+          <p className="mb-4 text-red-500">Failed to load products.</p>
           <Button variant="outline" onClick={() => refetch()} className="flex items-center gap-2 mx-auto">
             <RefreshCw size={15} /> Retry
           </Button>
@@ -229,35 +250,46 @@ const AdminProducts = () => {
 
       {!isLoading && !isError && (
         <div className="space-y-3">
-          {products.length === 0 && (
-            <p className="text-center text-gray-500 dark:text-gray-400 py-10">No products yet.</p>
-          )}
+          {products.length === 0 && <p className="py-10 text-center text-gray-500 dark:text-gray-400">No products yet.</p>}
+
           {products.map((product) => {
-            const imageUrl = product.image_url
-              ? buildAssetUrl(product.image_url)
-              : null;
+            const imageUrl = product.image_url ? buildAssetUrl(product.image_url) : null;
+            const isThisDeleting = deletingId !== null && String(deletingId) === String(product.id);
 
             return (
               <Card key={product.id} className="dark:bg-gray-800 dark:border-gray-700">
                 <CardContent className="flex items-center gap-4 py-3">
-                  {/* Image */}
-                  <div className="h-14 w-14 rounded bg-gray-100 dark:bg-gray-700 shrink-0 overflow-hidden">
-                    {imageUrl
-                      ? <img src={imageUrl} alt={product.name} className="h-full w-full object-contain" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E"; }} loading="lazy" />
-                      : <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E" alt="No image" className="h-full w-full object-contain opacity-50 grayscale" loading="lazy" />
-                    }
+                  <div className="h-14 w-14 shrink-0 overflow-hidden rounded bg-gray-100 dark:bg-gray-700">
+                    {imageUrl ? (
+                      <img
+                        src={imageUrl}
+                        alt={product.name}
+                        className="h-full w-full object-contain"
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src =
+                            "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+                        }}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <img
+                        src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E"
+                        alt="No image"
+                        className="h-full w-full object-contain opacity-50 grayscale"
+                        loading="lazy"
+                      />
+                    )}
                   </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-gray-800 dark:text-gray-200">{product.name}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       ₹{Number(product.price).toFixed(2)} · Stock: {product.stock_quantity ?? "—"}
                     </p>
                   </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex shrink-0 items-center gap-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -266,14 +298,16 @@ const AdminProducts = () => {
                     >
                       <Pencil size={13} /> Edit
                     </Button>
+
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleDelete(product)}
-                      disabled={deleteMutation.isPending}
+                      onClick={() => requestDelete(product)}
+                      disabled={deleteLoading && !isThisDeleting}
                       className="flex items-center gap-1"
                     >
-                      <Trash2 size={13} /> Delete
+                      {isThisDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={13} />}
+                      Delete
                     </Button>
                   </div>
                 </CardContent>
@@ -283,7 +317,31 @@ const AdminProducts = () => {
         </div>
       )}
 
-      {/* Create / Edit modal */}
+      {/* Confirmation modal */}
+      {confirmOpen && confirmTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <Card className="w-full max-w-lg dark:bg-gray-800 dark:border-gray-700">
+            <CardContent className="p-5">
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Delete "{confirmTarget.name}"?
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Are you sure you want to delete this product?</p>
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <Button variant="outline" disabled={deleteLoading} onClick={() => setConfirmOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" disabled={deleteLoading} onClick={confirmDelete} className="gap-2">
+                    {deleteLoading ? <Loader2 size={16} className="animate-spin" /> : null}
+                    Confirm
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {formOpen && (
         <ProductForm
           initial={editing}
@@ -292,7 +350,6 @@ const AdminProducts = () => {
         />
       )}
 
-      {/* Bulk Upload modal */}
       {bulkOpen && (
         <BulkUploadModal
           onClose={() => setBulkOpen(false)}
@@ -303,4 +360,5 @@ const AdminProducts = () => {
   );
 };
 
-export default React.memo(AdminProducts);
+export default React.memo(AdminProducts);
+

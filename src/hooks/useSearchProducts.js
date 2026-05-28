@@ -56,20 +56,26 @@ export function useSearchProducts(search) {
     queryKey: ["product-search", debouncedSearch],
     queryFn: async () => {
       if (!debouncedSearch.trim()) {
-        const res = await api.get("/products/?skip=0&limit=100");
-        return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+        const res = await api.get("/products/?skip=0&limit=1000");
+        const products = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+        console.log("[search-products] catalog count", products.length);
+        return products;
       }
 
       try {
         const res = await api.get("/products/search", {
-          params: { q: debouncedSearch, limit: 50 },
+          params: { q: debouncedSearch, limit: 1000 },
           silent: true,
         });
-        return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+        const products = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+        console.log("[search-products] search count", products.length);
+        return products;
       } catch (error) {
         if (![404, 405].includes(error.response?.status)) throw error;
-        const res = await api.get("/products/?skip=0&limit=100");
-        return Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+        const res = await api.get("/products/?skip=0&limit=1000");
+        const products = Array.isArray(res.data) ? res.data : res.data?.items ?? [];
+        console.log("[search-products] fallback count", products.length);
+        return products;
       }
     },
     placeholderData: keepPreviousData,

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Package, ClipboardList, LayoutDashboard, TrendingUp, DollarSign, ShoppingBag, Users, Loader2, CheckCircle, Clock, Truck, AlertCircle, RefreshCw } from "lucide-react";
+import { Package, ClipboardList, LayoutDashboard, TrendingUp, DollarSign, ShoppingBag, Users, Loader2, CheckCircle, Clock, Truck, AlertCircle, RefreshCw, MessageCircle } from "lucide-react";
 
 // Format currency in Indian Rupee style
 const formatCurrency = (amount) => {
@@ -364,6 +364,24 @@ const AdminDashboard = () => {
             </div>
             <Link to="/admin/users">
               <Button size="lg" variant="outline" className="mt-2">Manage Users</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        {/* Support */}
+        <Card className="dark:bg-gray-800 dark:border-gray-700 hover:shadow-lg transition-shadow">
+          <CardContent className="flex flex-col items-center py-12 gap-4">
+            <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-900/30 flex items-center justify-center">
+              <MessageCircle size={32} className="text-slate-700 dark:text-slate-300" />
+            </div>
+            <div className="text-center">
+              <p className="font-bold text-xl text-gray-900 dark:text-white mb-1">Support Center</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Realtime live chat with active customers.
+              </p>
+            </div>
+            <Link to="/admin/support">
+              <Button size="lg" className="mt-2">Open Live Chat</Button>
             </Link>
           </CardContent>
         </Card>

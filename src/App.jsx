@@ -5,6 +5,7 @@ import Navbar from "./components/Navbar";
 import NotificationToast from "./components/NotificationToast";
 import ApiToastBridge from "./components/ApiToastBridge";
 import AuthBootstrap from "./components/AuthBootstrap";
+import AIChat from "./components/AIChat";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import AdminRoute from "./routes/AdminRoute";
 import useThemeStore from "./store/themeStore";
@@ -23,6 +24,8 @@ const AdminDashboard = lazy(() => import("./pages/admin/AdminDashboard"));
 const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
 const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
 const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminSupport = lazy(() => import("./pages/admin/AdminSupport"));
+
 
 const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -63,12 +66,14 @@ const App = () => {
                 <Route element={<AdminRoute />}>
                   <Route path="/admin" element={<AdminDashboard />} />
                   <Route path="/admin/products" element={<AdminProducts />} />
-                  <Route path="/admin/orders" element={<AdminOrders />} />
+                <Route path="/admin/orders" element={<AdminOrders />} />
                   <Route path="/admin/users" element={<AdminUsers />} />
+                  <Route path="/admin/support" element={<AdminSupport />} />
                 </Route>
               </Routes>
             </Suspense>
           </main>
+          <AIChat />
           <NotificationToast />
         </div>
       </WebSocketProvider>

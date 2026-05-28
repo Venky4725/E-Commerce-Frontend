@@ -6,20 +6,18 @@ export function useProducts() {
   return useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const res = await api.get("/products/?skip=0&limit=100");
-      
-      // Backend returns: { items: [...], total: 6, page: 1, size: 20 }
-      // Extract the items array
+      const res = await api.get("/products/?skip=0&limit=1000");
+
       let products = [];
-      
-      if (res.data.items && Array.isArray(res.data.items)) {
+      if (res.data?.items && Array.isArray(res.data.items)) {
         products = res.data.items;
       } else if (Array.isArray(res.data)) {
         products = res.data;
       } else {
         console.warn("⚠️ Unexpected response format:", res.data);
       }
-      
+
+      console.log("[products] fetched", products.length);
       return products;
     },
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes

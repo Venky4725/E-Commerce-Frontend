@@ -23,7 +23,10 @@ const LiveChat = React.memo(function LiveChat() {
   const messagesEndRef = useRef(null);
 
   const userId = user?.id || user?.email || "anonymous";
-  const historyKey = `chat-history-${userId}`;
+  const adminId = "admin"; // best-effort (backend may override via payload)
+  const conversationKey = `support-${String(adminId)}-${String(userId)}`;
+  const historyKey = `chat-history-${conversationKey}`;
+
 
   const { data: messages = [], isLoading } = useQuery({
     queryKey: ["live-chat", userId],
@@ -63,8 +66,10 @@ const LiveChat = React.memo(function LiveChat() {
   const sendMessage = useCallback(() => {
     const trimmed = message.trim();
     if (!trimmed || !isConnected) return;
-    
+
     const timestamp = new Date().toISOString();
+
+    // Deterministic fallback room id for this customer<->admin pair.
     const payload = {
       id: `${userId}-${Date.now()}`,
       body: trimmed,
@@ -72,10 +77,16 @@ const LiveChat = React.memo(function LiveChat() {
       user_id: user?.id,
       userId: user?.id, // for compatibility
       username: user?.username || user?.email || "User",
-      timestamp: timestamp,
+      timestamp,
+      session_id: conversationKey,
+      room_id: conversationKey,
+      conversation_id: conversationKey,
+      customer_id: user?.id,
+      admin_id: adminId,
     };
-    
+
     const sent = sendJson({ type: "chat.message", payload });
+
     
     if (sent) {
       // Optimistic update
