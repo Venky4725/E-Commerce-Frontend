@@ -142,10 +142,10 @@ const OrderCard = React.memo(function OrderCard({ order, isCancelling, onCancel,
                   <div className="min-w-0 flex-1">
                     <p className={`truncate font-medium ${unavailable ? "text-gray-500 line-through" : "text-gray-900 dark:text-gray-100"}`}>{name}</p>
                     <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                      Quantity: {quantity} x Rs. {price.toFixed(2)}
+                      Quantity: {quantity} x Rs. {price.toLocaleString('en-IN')}
                     </p>
                   </div>
-                  <p className="shrink-0 font-semibold text-gray-900 dark:text-gray-100">Rs. {(price * quantity).toFixed(2)}</p>
+                  <p className="shrink-0 font-semibold text-gray-900 dark:text-gray-100">Rs. {(price * quantity).toLocaleString('en-IN')}</p>
                 </div>
               );
             })}

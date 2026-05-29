@@ -28,9 +28,9 @@
   @apply bg-gray-400 dark:bg-gray-600;
 }
 
-/* Smooth transitions */
-* {
-  @apply transition-colors duration-200;
+/* Smooth transitions only for specific properties and elements */
+.transition-theme {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 
 /* Focus states */

@@ -8,6 +8,7 @@ import { useToast } from "./ui/toast";
 import useAuthStore from "../store/authStore";
 import { buildAssetUrl } from "../api/endpoints";
 import { HighlightText } from "./HighlightText";
+import { getCategoryPlaceholder } from "../lib/utils";
 
 function ProductCard({ product, highlight = "" }) {
   const navigate = useNavigate();

@@ -10,7 +10,8 @@ import { useWebSocketContext } from "../websocket/WebSocketProvider";
 
 const Navbar = () => {
   const { token, user } = useAuthStore();
-  const { theme, toggleTheme } = useThemeStore();
+  const theme = useThemeStore((state) => state.theme);
+  const toggleTheme = useThemeStore((state) => state.toggleTheme);
   const performLogout = useLogout();
   const [menuOpen, setMenuOpen] = useState(false);
   const { connectionState } = useWebSocketContext();

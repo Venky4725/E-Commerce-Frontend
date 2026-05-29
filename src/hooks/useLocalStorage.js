@@ -45,6 +45,17 @@ export function useLocalStorage(key, initialValue) {
     [key, storedValue]
   );
 
+  // Sync with localStorage when key changes
+  useEffect(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      setStoredValue(item ? JSON.parse(item) : initialValue);
+    } catch (error) {
+      console.error(`Error syncing localStorage key "${key}":`, error);
+      setStoredValue(initialValue);
+    }
+  }, [key, initialValue]);
+
   // Listen for changes to this key in other tabs/windows
   useEffect(() => {
     const handleStorageChange = (e) => {

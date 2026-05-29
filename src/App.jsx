@@ -33,19 +33,24 @@ const PageLoader = () => (
   </div>
 );
 
-const App = () => {
+const ThemeInitializer = () => {
   const theme = useThemeStore((state) => state.theme);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
+  return null;
+};
+
+const App = () => {
   return (
     <Router>
       <WebSocketProvider>
+        <ThemeInitializer />
         <ApiToastBridge />
         <AuthBootstrap />
-        <div className="min-h-screen bg-gray-50 text-gray-900 transition-colors duration-200 dark:bg-gray-950 dark:text-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 transition-theme">
           <Navbar />
           <main className="pb-8">
             <Suspense fallback={<PageLoader />}>

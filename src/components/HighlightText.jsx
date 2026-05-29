@@ -15,7 +15,7 @@ export const HighlightText = ({ text, highlight }) => {
     <span>
       {parts.map((part, i) =>
         regex.test(part) ? (
-          <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 dark:text-white rounded-sm px-0.5">
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 dark:text-white rounded-sm">
             {part}
           </mark>
         ) : (

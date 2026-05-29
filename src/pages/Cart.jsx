@@ -38,12 +38,12 @@ const Cart = () => {
               const productRes = await api.get(`/products/${item.product_id}`);
               return { ...item, product: productRes.data };
             } catch {
-              return { ...item, product: null };
+              return null;
             }
           })
         );
 
-        setItems(enriched);
+        setItems(enriched.filter(item => item !== null));
       } catch (err) {
         setError("Failed to load cart.");
       } finally {
@@ -223,7 +223,7 @@ const Cart = () => {
                     <p className="font-semibold text-gray-800 truncate">{name}</p>
                     {price !== null && (
                       <p className="text-sm text-gray-500 mt-0.5">
-                        ₹{Number(price).toFixed(2)} each
+                        ₹{Number(price).toLocaleString('en-IN')} each
                       </p>
                     )}
                     {/* Stock availability */}
@@ -270,7 +270,7 @@ const Cart = () => {
                   <div className="flex flex-col items-end gap-3 shrink-0">
                     {price !== null && (
                       <p className="font-bold text-blue-600 text-base">
-                        ₹{(price * quantity).toFixed(2)}
+                        ₹{(price * quantity).toLocaleString('en-IN')}
                       </p>
                     )}
                     <button
@@ -294,11 +294,11 @@ const Cart = () => {
               <span className="text-gray-500 dark:text-gray-400 text-sm">
                 Subtotal ({items.length} item{items.length !== 1 ? "s" : ""})
               </span>
-              <span className="font-semibold text-gray-800 dark:text-gray-200">₹{total.toFixed(2)}</span>
+              <span className="font-semibold text-gray-800 dark:text-gray-200">₹{total.toLocaleString('en-IN')}</span>
             </div>
             <div className="flex justify-between items-center border-t border-gray-200 dark:border-gray-600 pt-3 mt-1 mb-4">
               <span className="font-bold text-gray-900 dark:text-white text-lg">Total</span>
-              <span className="font-bold text-blue-600 text-xl">₹{total.toFixed(2)}</span>
+              <span className="font-bold text-blue-600 text-xl">₹{total.toLocaleString('en-IN')}</span>
             </div>
             <Link to="/checkout">
               <Button className="w-full" size="lg">Proceed to Checkout</Button>

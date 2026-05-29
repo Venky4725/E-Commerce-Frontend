@@ -8,6 +8,7 @@ import { ShoppingCart, ArrowLeft, Loader2, RefreshCw } from "lucide-react";
 import api from "../api/api";
 import useAuthStore from "../store/authStore";
 import { buildAssetUrl } from "../api/endpoints";
+import { getCategoryPlaceholder } from "../lib/utils";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -95,12 +96,12 @@ const ProductDetail = () => {
                   className="max-h-80 w-full object-contain"
                   onError={(e) => {
                     e.currentTarget.onerror = null;
-                    e.currentTarget.src = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+                    e.currentTarget.src = getCategoryPlaceholder(product.category, product.name);
                   }}
                 />
               ) : (
                 <div className="flex w-full aspect-square items-center justify-center text-sm text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-t-xl md:rounded-l-xl md:rounded-tr-none">
-                  <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' fill='%23f3f4f6'%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E" alt="No image available" className="max-h-80 w-full object-contain opacity-50 grayscale" loading="lazy" />
+                  <img src={getCategoryPlaceholder(product.category, product.name)} alt={product.name} className="max-h-80 w-full object-contain grayscale transition-transform hover:scale-105" loading="lazy" />
                 </div>
               )}
 
@@ -114,7 +115,7 @@ const ProductDetail = () => {
                 </h1>
 
                 <p className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-6">
-                  ₹{Number(product.price).toFixed(2)}
+                  ₹{Number(product.price).toLocaleString('en-IN')}
                 </p>
 
                 {product.description && (

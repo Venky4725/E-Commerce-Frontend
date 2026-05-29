@@ -285,7 +285,7 @@ const AdminProducts = () => {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-gray-800 dark:text-gray-200">{product.name}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      ₹{Number(product.price).toFixed(2)} · Stock: {product.stock_quantity ?? "—"}
+                      ₹{Number(product.price).toLocaleString('en-IN')} · Stock: {product.stock_quantity ?? "—"}
                     </p>
                   </div>
 

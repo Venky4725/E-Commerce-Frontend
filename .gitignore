@@ -1,9 +1,17 @@
 # Dependencies
 node_modules/
+.venv/
+venv/
+env/
+lib/
+lib64/
 
 # Build output
 dist/
 dist-ssr/
+build/
+coverage/
+stats.html
 
 # Local env files
 .env
@@ -28,6 +36,19 @@ Thumbs.db
 
 # Vite cache
 .vite/
+
+# Python cache
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.pyc
+*.pyo
+*.pyd
+
+# Temp uploads
+uploads/temp/
+tmp/
 
 # Documentation files (keep only README.md)
 *_FIX*.md

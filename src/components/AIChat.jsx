@@ -40,15 +40,20 @@ const AIChat = () => {
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
   };
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(scrollToBottom, 100);
-      inputRef.current?.focus();
+      scrollToBottom();
+      // Only focus input if it's the first open or we just sent a message
+      if (!isLoading) {
+        inputRef.current?.focus();
+      }
     }
-  }, [messages, isOpen]);
+  }, [messages, isOpen, isLoading]);
 
   const handleSend = () => {
     if (!inputValue.trim() || isLoading) return;
@@ -75,7 +80,7 @@ const AIChat = () => {
     const lower = content.toLowerCase();
 
     if (lower.includes("no matching products found") || lower.includes("no products found")) {
-      return "I couldn’t find that exact item, but these related picks are worth exploring.";
+      return "I couldn't find an exact match. Here are similar products.";
     }
 
     if (msg.products?.length > 0) {
@@ -283,11 +288,21 @@ const AIChat = () => {
                       ? "border-blue-500/60 bg-gradient-to-br from-blue-600 via-indigo-600 to-slate-900 text-white shadow-[0_18px_30px_-14px_rgba(59,130,246,0.55)]"
                       : msg.isError
                       ? "border-rose-500/50 bg-rose-500/10 text-rose-100"
+                      : msg.isUnavailable
+                      ? "border-amber-500/40 bg-amber-500/5 text-amber-50 shadow-[0_10px_20px_-10px_rgba(245,158,11,0.2)]"
                       : "border-slate-800 bg-slate-900/95 text-slate-100"
                   )}
                 >
+                  {msg.role === "assistant" && msg.isUnavailable && (
+                    <div className="mb-2 flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-400">
+                        <X size={10} strokeWidth={4} /> Not Available
+                      </span>
+                    </div>
+                  )}
+
                   {msg.content || !msg.isStreaming ? (
-                    <div className="whitespace-pre-wrap break-words leading-relaxed text-[13px] font-medium text-slate-100">
+                    <div className="whitespace-pre-wrap break-words leading-relaxed text-[13px] font-medium text-inherit">
                       {getAssistantMessage(msg)}
                       {msg.isStreaming && (
                         <span className="inline-block w-2 h-4 ml-1 bg-current animate-pulse align-middle" />
@@ -303,7 +318,7 @@ const AIChat = () => {
                   {/* AI Recommended Products Cards inside Speech Bubbles */}
                   {msg.role === "assistant" && msg.products && msg.products.length > 0 && (
                     <div className="mt-3.5 flex flex-col gap-3 w-full animate-[fadeIn_220ms_ease-out]">
-                      {msg.products.map((product) => {
+                      {Array.from(msg.products.reduce((map, p) => { if (!p || !p.id || !p.name) return map; const key = p.id || p.name.toLowerCase().trim(); if (!map.has(key)) map.set(key, p); return map; }, new Map()).values()).map((product) => {
                         const imageUrl = (product.image || product.image_url) 
                           ? buildAssetUrl(product.image || product.image_url) 
                           : null;
@@ -321,9 +336,9 @@ const AIChat = () => {
                           <Link
                             key={product.id}
                             to={`/product/${product.id}`}
-                            className="group flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/90 p-3 shadow-[0_14px_24px_-16px_rgba(15,23,42,0.9)] transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400/80 hover:bg-slate-900 hover:shadow-[0_18px_28px_-14px_rgba(59,130,246,0.45)]"
+                            className="group flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-700"
                           >
-                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-slate-800 bg-white p-1.5 shadow-inner shadow-slate-200/70">
+                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-1 dark:border-gray-700 dark:bg-gray-700">
                               <img 
                                 src={imageUrl || placeholderUrl} 
                                 alt={product.name}
@@ -336,7 +351,7 @@ const AIChat = () => {
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col justify-between h-full">
                               <div>
-                                <h4 className="truncate text-[12px] font-semibold text-slate-100 transition-colors group-hover:text-blue-200">
+                                <h4 className="truncate text-[13px] font-semibold text-gray-900 transition-colors group-hover:text-blue-600 dark:text-gray-100 dark:group-hover:text-blue-400">
                                   {product.name}
                                 </h4>
                               </div>
@@ -345,7 +360,7 @@ const AIChat = () => {
                               {(product.brand || tags.length > 0) && (
                                 <div className="flex items-center flex-wrap gap-1 mt-0.5">
                                   {product.brand && (
-                                    <span className="rounded-full border border-slate-700 bg-slate-800/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-100 shrink-0">
+                                    <span className="rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/70 px-2 py-0.5 text-[10px] font-semibold text-gray-500 dark:text-gray-300 shrink-0">
                                       {product.brand}
                                     </span>
                                   )}
@@ -425,7 +440,7 @@ const AIChat = () => {
           <button
             onClick={handleSend}
             disabled={!inputValue.trim() || isLoading}
-            className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-slate-900 text-white shadow-[0_14px_24px_-12px_rgba(59,130,246,0.65)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_28px_-12px_rgba(59,130,246,0.85)] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
+            className="h-12 w-12 shrink-0 rounded-lg bg-blue-600 text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none flex items-center justify-center"
           >
             {isLoading ? (
               <Loader2 size={16} className="animate-spin text-black" />

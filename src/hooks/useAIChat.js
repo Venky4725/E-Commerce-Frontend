@@ -1,9 +1,8 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import useAuthStore from "../store/authStore";
 import { API_URL } from "../api/endpoints";
 import { useToast } from "../components/ui/toast";
 import { preprocessQuery, getDynamicSuggestions } from "../lib/aiQueryUtils";
-import { logAIRequest, logAIResponse } from "../lib/searchDebugLogger";
 
 const AI_FALLBACK_MESSAGE = "I’m pulling the best ShopKart options for you right now.";
 const AI_ERROR_MESSAGE = "I’m having trouble connecting right now. Please try again in a moment — I’ll keep the shopping flow smooth.";
@@ -32,20 +31,82 @@ const suggestionMap = {
  * Hook for AI Chat streaming integration with robust lifecycle management
  */
 export const useAIChat = () => {
-  const [messages, setMessages] = useState([]);
+  const user = useAuthStore((state) => state.user);
+  const { token } = useAuthStore();
+  
+  // Robust userId scoping for storage isolation
+  const userId = useMemo(() => {
+    if (!user) return "anonymous";
+    const id = user.id || user.email;
+    return id ? `user-${id}` : "anonymous";
+  }, [user]);
+
+  const rawUserId = useMemo(() => {
+    if (!user) return "anonymous";
+    return user.id || user.email || "anonymous";
+  }, [user]);
+
+  const storageKey = `ai-chat-history-${userId}`;
+  const exclusionStorageKey = `ai-chat-exclusions-${userId}`;
+
+  const [messages, setMessages] = useState(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [exclusions, setExclusions] = useState(() => {
+    try {
+      const stored = localStorage.getItem(exclusionStorageKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [isLoading, setIsLoading] = useState(false);
   const [activeProduct, setActiveProduct] = useState(null);
   const [lastQueryMeta, setLastQueryMeta] = useState({ intent: "none", normalized: "", filters: {} });
-  const { token } = useAuthStore();
   const { toast } = useToast();
   const abortControllerRef = useRef(null);
   const timeoutRef = useRef(null);
   const messagesRef = useRef([]);
   const streamIdRef = useRef(0);
 
+  // Sync messages and exclusions when user changes
+  useEffect(() => {
+    try {
+      const storedMsg = localStorage.getItem(storageKey);
+      const storedExcl = localStorage.getItem(exclusionStorageKey);
+      setMessages(storedMsg ? JSON.parse(storedMsg) : []);
+      setExclusions(storedExcl ? JSON.parse(storedExcl) : []);
+      setActiveProduct(null);
+      setLastQueryMeta({ intent: "none", normalized: "", filters: {} });
+    } catch {
+      setMessages([]);
+      setExclusions([]);
+    }
+  }, [storageKey, exclusionStorageKey]);
+
   useEffect(() => {
     messagesRef.current = messages;
-  }, [messages]);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(messages));
+    } catch (e) {
+      console.error("Failed to save AI chat history", e);
+    }
+  }, [messages, storageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(exclusionStorageKey, JSON.stringify(exclusions));
+    } catch (e) {
+      console.error("Failed to save AI chat exclusions", e);
+    }
+  }, [exclusions, exclusionStorageKey]);
 
   const clearTimeoutRef = useCallback(() => {
     if (timeoutRef.current) {
@@ -54,7 +115,7 @@ export const useAIChat = () => {
     }
   }, []);
 
-  const finalizeAssistantMessage = useCallback((messageId, content, products, isError = false, debug_info = null) => {
+  const finalizeAssistantMessage = useCallback((messageId, content, products, isError = false, debug_info = null, isUnavailable = false) => {
     // Phase 5: Track active product if matches were found
     if (Array.isArray(products) && products.length > 0) {
       setActiveProduct(products[0]);
@@ -69,6 +130,7 @@ export const useAIChat = () => {
               products: Array.isArray(products) && products.length > 0 ? products : msg.products,
               isStreaming: false,
               isError,
+              isUnavailable: isUnavailable || msg.isUnavailable,
               debug_info: debug_info || msg.debug_info,
             }
           : msg
@@ -82,7 +144,6 @@ export const useAIChat = () => {
         return;
       }
 
-      console.debug("AI Chat: Stream end", { streamId, reason });
       setIsLoading(false);
       clearTimeoutRef();
       abortControllerRef.current = null;
@@ -94,7 +155,6 @@ export const useAIChat = () => {
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
-        console.debug("AI Chat Hook: Cleanup on unmount, aborting active stream");
         abortControllerRef.current.abort();
       }
       if (timeoutRef.current) {
@@ -113,15 +173,10 @@ export const useAIChat = () => {
 
       if (isSuggestion) {
         // Structured suggestion flow
-        console.log("🖱️ Suggestion clicked:", input.suggestion_type);
         const mapped = suggestionMap[input.suggestion_type] || { query: input.label, recommendation_mode: "best" };
         
         text = input.label || "";
         
-        console.log("🖱️ Structured payload:", { suggestion_type: input.suggestion_type });
-        console.log("🖱️ Mapped query:", mapped.query);
-        console.log("🖱️ Recommendation mode:", mapped.recommendation_mode);
-
         meta = {
           original: text,
           normalized: mapped.query,
@@ -143,15 +198,30 @@ export const useAIChat = () => {
         setLastQueryMeta(meta);
 
         if (typeof input === "object" && input.type) {
-          console.log("🖱️ AI Chat Phase 7: Suggestion Clicked ->", {
-            label: input.label,
-            intent: input.type,
-            query: input.query
-          });
+          // Meta handled
         }
       }
 
       if (!text.trim()) return;
+
+      // Handle Exclusions
+      if (meta.excludedBrand) {
+        setExclusions(prev => {
+          if (!prev.includes(meta.excludedBrand)) {
+            return [...prev, meta.excludedBrand];
+          }
+          return prev;
+        });
+      }
+
+      if (meta.needsExclusion && activeProduct?.brand) {
+        setExclusions(prev => {
+          if (!prev.includes(activeProduct.brand)) {
+            return [...prev, activeProduct.brand];
+          }
+          return prev;
+        });
+      }
 
       
       const streamId = streamIdRef.current + 1;
@@ -194,10 +264,23 @@ export const useAIChat = () => {
         },
       ]);
 
+      // Handle Unavailable Brand Short-circuit
+      if (meta.unavailableBrand) {
+        const brandName = meta.unavailableBrand;
+        const fallbackText = `${brandName} is currently unavailable. I’ve found some great alternatives for you.`;
+        
+        // Suggest alternatives from the same category
+        meta.normalized = meta.category ? `${meta.category}` : "popular products";
+        meta.recommendationMode = "best";
+        // Ensure we don't try to find the unavailable brand
+        meta.brand = null;
+        
+        // We will continue with the fetch but using the category alternatives
+        // but we'll prepend the unavailability message to the content later.
+      }
+
       // SHORT-CIRCUIT: Conversational Bypass (Phase 4)
       if (meta.localResponse) {
-        console.log("⚡ AI Chat Phase 7: Conversational Bypass ->", meta.intent);
-        
         setTimeout(() => {
           setMessages((prev) =>
             prev.map((msg) =>
@@ -280,14 +363,29 @@ export const useAIChat = () => {
       };
 
       const updateAssistantMessage = () => {
+        let displayContent = aiContent;
+        if (meta.unavailableBrand && !aiContent.includes(meta.unavailableBrand)) {
+          displayContent = `${meta.unavailableBrand} is currently unavailable. I’ve found some great alternatives for you. ${aiContent}`;
+        }
+
+        // Client-side filtering as a safety layer
+        const filteredProducts = aiProducts.filter(p => {
+          if (!p.brand) return true;
+          return !exclusions.some(excl => 
+            p.brand.toLowerCase().includes(excl.toLowerCase()) || 
+            excl.toLowerCase().includes(p.brand.toLowerCase())
+          );
+        });
+
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === aiMessageId
               ? {
                   ...msg,
-                  content: aiContent,
-                  products: aiProducts,
+                  content: displayContent,
+                  products: filteredProducts,
                   debug_info: aiDebugInfo,
+                  isUnavailable: !!meta.unavailableBrand,
                 }
               : msg
           )
@@ -298,10 +396,22 @@ export const useAIChat = () => {
         if (isFinalized) return;
         isFinalized = true;
 
-        // Structured debug logging
-        if (!error) logAIResponse(content, products);
+        let finalContent = content;
+        if (meta.unavailableBrand && content && !content.includes(meta.unavailableBrand)) {
+          finalContent = `${meta.unavailableBrand} is currently unavailable. I’ve found some great alternatives for you. ${content}`;
+        }
 
-        finalizeAssistantMessage(aiMessageId, error ? undefined : content, products, error, aiDebugInfo);
+        // Client-side filtering as a safety layer
+        const filteredProducts = products.filter(p => {
+          if (!p.brand) return true;
+          return !exclusions.some(excl => 
+            p.brand.toLowerCase().includes(excl.toLowerCase()) || 
+            excl.toLowerCase().includes(p.brand.toLowerCase())
+          );
+        });
+
+        // Finalize state
+        finalizeAssistantMessage(aiMessageId, error ? undefined : finalContent, filteredProducts, error, aiDebugInfo, !!meta.unavailableBrand);
       };
 
       const handleStreamTimeout = () => {
@@ -321,7 +431,12 @@ export const useAIChat = () => {
       try {
         const isFollowUp = meta.intent === "follow_up" && activeProduct;
         const payload = {
-          messages: [{ role: "user", content: meta.normalized }],
+          messages: [
+            ...messagesRef.current
+              .filter(m => !m.isError && m.content)
+              .map(m => ({ role: m.role, content: m.content })),
+            { role: "user", content: meta.normalized }
+          ],
           max_price: meta.maxPrice,
           brand_hint: meta.brand || null,
           category_hint: meta.category || null,
@@ -334,15 +449,14 @@ export const useAIChat = () => {
           } : null,
           recommendation_mode: meta.recommendationMode || false,
           stream: true,
+          exclude_brands: exclusions,
         };
 
         if (meta.suggestion_type) {
           payload.suggestion_type = meta.suggestion_type;
         }
 
-        // Structured debug logging
-        logAIRequest(text, meta, payload);
-
+        // Fetch AI response
         const response = await fetch(`${API_URL}/ai/chat`, {
           method: "POST",
           headers: {
@@ -373,7 +487,6 @@ export const useAIChat = () => {
           const { done, value } = await reader.read();
 
           if (done) {
-            console.debug("AI Chat: Stream done", { streamId, buffered: buffer.length, receivedChunks: hasReceivedChunk });
             const result = processBuffer(buffer);
             buffer = result.remaining;
             updateAssistantMessage();
@@ -384,7 +497,6 @@ export const useAIChat = () => {
 
           resetInactivityTimeout();
           const chunk = decoder.decode(value, { stream: true });
-          console.debug("AI Chat: Chunk received", { streamId, chunkLength: chunk.length });
           buffer += chunk;
 
           const result = processBuffer(buffer);
@@ -392,7 +504,6 @@ export const useAIChat = () => {
           updateAssistantMessage();
 
           if (result.encounteredDone) {
-            console.debug("AI Chat: Stream end", { streamId, receivedChunks: hasReceivedChunk });
             finalize(aiContent, aiProducts, false);
             cleanup(streamId, "stream-complete");
             return;
@@ -400,7 +511,6 @@ export const useAIChat = () => {
         }
       } catch (error) {
         if (error?.name === "AbortError") {
-          console.debug("AI Chat: Abort", { streamId, reason: "stream-aborted" });
           finalize(aiContent, aiProducts, false);
           cleanup(streamId, "abort");
           return;
@@ -437,11 +547,12 @@ export const useAIChat = () => {
         }
       }
     },
-    [clearTimeoutRef, cleanup, finalizeAssistantMessage, toast, token, activeProduct]
+    [clearTimeoutRef, cleanup, finalizeAssistantMessage, toast, token, activeProduct, exclusions, rawUserId]
   );
 
   const clearChat = useCallback(() => {
     setMessages([]);
+    setExclusions([]);
     setActiveProduct(null);
   }, []);
 
@@ -449,7 +560,6 @@ export const useAIChat = () => {
     const lastUserMessage = [...messages].reverse().find((message) => message.role === "user");
 
     if (lastUserMessage) {
-      console.debug("AI Chat: Retry triggered", { message: lastUserMessage.content });
       const index = messages.indexOf(lastUserMessage);
       setMessages(messages.slice(0, index));
       sendMessage(lastUserMessage.content);

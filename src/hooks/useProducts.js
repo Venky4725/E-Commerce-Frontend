@@ -17,7 +17,6 @@ export function useProducts() {
         console.warn("⚠️ Unexpected response format:", res.data);
       }
 
-      console.log("[products] fetched", products.length);
       return products;
     },
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes

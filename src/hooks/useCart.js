@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useLocalStorage } from "./useLocalStorage";
+import useAuthStore from "../store/authStore";
 
 /**
  * Custom hook for cart management
@@ -9,7 +10,15 @@ import { useLocalStorage } from "./useLocalStorage";
  * @returns {Object} Cart state and actions
  */
 export function useCart() {
-  const [cart, setCart] = useLocalStorage("shopping-cart", []);
+  const user = useAuthStore((state) => state.user);
+  
+  const userId = useMemo(() => {
+    if (!user) return "guest";
+    const id = user.id || user.email;
+    return id ? `user-${id}` : "guest";
+  }, [user]);
+
+  const [cart, setCart] = useLocalStorage(`shopping-cart-${userId}`, []);
   const [isLoading, setIsLoading] = useState(false);
 
   // Add item to cart

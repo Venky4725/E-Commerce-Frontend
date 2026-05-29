@@ -62,11 +62,11 @@ const Checkout = () => {
               const p = await api.get(`/products/${item.product_id}`);
               return { ...item, product: p.data };
             } catch {
-              return { ...item, product: null };
+              return null;
             }
           })
         );
-        setCartItems(enriched);
+        setCartItems(enriched.filter(item => item !== null));
       } catch {
         toast({ title: "Failed to load cart", variant: "destructive" });
       } finally {
@@ -167,7 +167,7 @@ const Checkout = () => {
                       <Loader2 size={16} className="animate-spin" /> Placing order...
                     </span>
                   ) : (
-                    `Place Order — ₹${total.toFixed(2)}`
+                    `Place Order — ₹${total.toLocaleString('en-IN')}`
                   )}
                 </Button>
               </form>
@@ -213,7 +213,7 @@ const Checkout = () => {
                           <p className="text-xs text-gray-500 dark:text-gray-400">Qty: {qty}</p>
                         </div>
                         <p className="text-sm font-semibold text-blue-600 shrink-0">
-                          ₹{(price * qty).toFixed(2)}
+                          ₹{(price * qty).toLocaleString('en-IN')}
                         </p>
                       </div>
                     );
@@ -221,7 +221,7 @@ const Checkout = () => {
 
                   <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mt-3 flex justify-between">
                     <span className="font-bold text-gray-900 dark:text-white">Total</span>
-                    <span className="font-bold text-blue-600 text-lg">₹{total.toFixed(2)}</span>
+                    <span className="font-bold text-blue-600 text-lg">₹{total.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               )}

@@ -35,7 +35,13 @@ const isChatEvent = (type) => ["chat.message", "chat_message", "message", "chat"
   // Normalize chat user/session routing for admin<->customer realtime.
   // Best-effort: if backend provides session_id/room_id, we store by customerId as well.
   const getChatParticipants = (payload) => {
-    const customerId = payload.customer_id || payload.user_id || payload.userId;
+    let customerId = payload.customer_id || payload.user_id || payload.userId;
+    
+    // Normalize customerId with user- prefix if it looks like a raw ID
+    if (customerId && customerId !== "anonymous" && !String(customerId).startsWith("user-")) {
+      customerId = `user-${customerId}`;
+    }
+
     const senderId = payload.user_id || payload.userId;
     const adminId = payload.admin_id || (user?.is_admin ? senderId : null);
 
@@ -58,7 +64,11 @@ export function useWebSocket() {
   const [connectionState, setConnectionState] = useState(IDLE);
   const [nextRetryAt, setNextRetryAt] = useState(null);
 
-  const userId = user?.id || user?.email;
+  const userId = useMemo(() => {
+    if (!user) return "anonymous";
+    const id = user.id || user.email;
+    return id ? `user-${id}` : "anonymous";
+  }, [user]);
 
   const url = useMemo(() => {
     if (!token) return null;
@@ -113,22 +123,9 @@ export function useWebSocket() {
       if (isOrderEvent(type)) {
         applyOrderEvent(payload);
       } else if (isChatEvent(type)) {
-        const { customerId } = getChatParticipants(payload);
+        const { customerId, senderId, sessionId } = getChatParticipants(payload);
         const targetUserId = customerId || userId || "anonymous";
         const msgId = payload.id || `${payload.user_id || payload.username || "support"}-${payload.timestamp || Date.now()}`;
-
-        logDebug("incoming chat.message", {
-          type,
-          msgId,
-          rawPayload: payload,
-          derived: { customerId, senderId, sessionId },
-          targetUserId,
-          pathname: window.location.pathname,
-          connectionState,
-          currentUser: user?.id,
-          isAdmin: user?.is_admin === true,
-        });
-
 
         // Route messages into the per-customer chat cache so admin can see multiple sessions.
         queryClient.setQueryData(["live-chat", String(targetUserId)], (current = []) => {
@@ -139,12 +136,13 @@ export function useWebSocket() {
             ? current
             : [...current, { ...payload, id: msgId, customer_id: payload.customer_id || targetUserId }].slice(-200);
 
-          logDebug("cache update", {
-            queryKey: ["live-chat", String(targetUserId)],
-            beforeLen,
-            exists,
-            afterLen: Array.isArray(next) ? next.length : 0,
-          });
+          // Persist to localStorage for durability across reloads
+          try {
+            const historyKey = `chat-history-${targetUserId}`;
+            localStorage.setItem(historyKey, JSON.stringify(next));
+          } catch (e) {
+            console.error("Failed to persist chat message", e);
+          }
 
           return next;
         });
@@ -152,7 +150,6 @@ export function useWebSocket() {
 
 
         // Add notification for incoming chat messages (not from self)
-        const senderId = payload.user_id || payload.userId;
         const isFromSelf = senderId && user?.id && String(senderId) === String(user.id);
 
         // If admin is receiving customer messages, still show notification.
@@ -195,15 +192,6 @@ export function useWebSocket() {
 
   const handleMessageRef = useRef(handleMessage);
   handleMessageRef.current = handleMessage;
-
-  // Debug helpers
-  const logDebug = (...args) => {
-    if (import.meta?.env?.DEV) {
-      // eslint-disable-next-line no-console
-      console.debug("[ws-chat-debug]", ...args);
-    }
-  };
-
 
   const connect = useCallback(() => {
     if (!url || !token) {

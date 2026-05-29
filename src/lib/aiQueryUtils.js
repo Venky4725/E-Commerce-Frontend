@@ -146,6 +146,13 @@ const SHOPPING_ALIAS_MAP = [
     brand: "Adidas",
     category: "Fashion",
   },
+  {
+    triggers: ["redtape", "red tape"],
+    expand: "shoes footwear",
+    brand: "RedTape",
+    category: "Fashion",
+    unavailable: true,
+  },
 
   // ── Synonym/vocabulary expansion ─────────────────────────────────────────
   {
@@ -416,6 +423,24 @@ export const preprocessQuery = (text) => {
     };
   }
 
+  // 1b. Detect Brand Exclusions (e.g. "not nike", "except apple", "no samsung")
+  const exclusionPatterns = [
+    /\b(?:not|except|no|without|other than|another option than)\s+([a-z0-9]+)\b/i,
+    /\b([a-z0-9]+)\s+is\s+not\s+what\s+i\s+want\b/i,
+  ];
+  
+  let excludedBrand = null;
+  for (const pattern of exclusionPatterns) {
+    const match = raw.match(pattern);
+    if (match) {
+      excludedBrand = match[1];
+      break;
+    }
+  }
+
+  // Generic exclusion intent
+  const needsExclusion = /\b(?:other brand|another option|something else|different brand)\b/i.test(raw);
+
   if (intent === "follow_up") {
     return {
       original: text,
@@ -428,10 +453,12 @@ export const preprocessQuery = (text) => {
       category: null,
       priceSort: null,
       aliasLabel: null,
+      excludedBrand,
+      needsExclusion,
     };
   }
 
-  // 2. Shopping Alias Resolution ← NEW
+  // 2. Shopping Alias Resolution
   const alias = resolveShoppingAlias(raw);
   let queryAfterAlias = raw;
   let brand = null;
@@ -439,18 +466,21 @@ export const preprocessQuery = (text) => {
   let priceSort = null;
   let aliasLabel = null;
   let resolvedRecommendationMode = false;
+  let unavailableBrand = null;
 
   if (alias) {
+    if (alias.unavailable) {
+      unavailableBrand = alias.brand;
+    }
+
     // Replace the trigger in the raw query with the expanded form
     if (alias.expand !== undefined && alias.expand !== "") {
-      // Build a regex from all triggers to replace in the original query
       const triggerPattern = alias.triggers
         .map((t) => t.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"))
         .join("|");
       const triggerRegex = new RegExp(`(${triggerPattern})`, "gi");
       queryAfterAlias = raw.replace(triggerRegex, alias.expand).replace(/\s+/g, " ").trim();
     } else if (alias.expand === "") {
-      // Pure intent alias (premium/budget/trending) — strip the trigger words
       const triggerPattern = alias.triggers
         .map((t) => t.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"))
         .join("|");
@@ -525,6 +555,9 @@ export const preprocessQuery = (text) => {
     category,
     priceSort,
     aliasLabel,
+    excludedBrand,
+    unavailableBrand,
+    needsExclusion,
   };
 };
 
