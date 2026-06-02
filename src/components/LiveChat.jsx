@@ -66,6 +66,7 @@ const LiveChat = React.memo(function LiveChat() {
 
   const isConnected = connectionState === "connected";
   const isConnecting = connectionState === "connecting" || connectionState === "reconnecting";
+  const connectionLabel = isConnected ? "Connected" : "Reconnecting...";
 
   const statusIcon = useMemo(() => {
     if (isConnecting) return <Loader2 size={14} className="animate-spin" />;
@@ -117,7 +118,7 @@ const LiveChat = React.memo(function LiveChat() {
         <div className={`flex items-center gap-2 text-xs capitalize ${stateStyles[connectionState] || stateStyles.idle}`}>
           <div className="flex items-center gap-1">
             {statusIcon}
-            <span>{connectionState}</span>
+            <span>{connectionLabel}</span>
           </div>
           {!isConnected && (
             <button type="button" onClick={reconnect} className="ml-1 rounded px-1 py-0.5 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -171,7 +172,7 @@ const LiveChat = React.memo(function LiveChat() {
             value={message}
             onChange={(event) => setMessage(event.target.value)}
             onKeyDown={(event) => event.key === "Enter" && sendMessage()}
-            placeholder={isConnected ? "Type a message..." : "Connecting..."}
+            placeholder={isConnected ? "Type a message..." : "Reconnecting..."}
             disabled={!isConnected}
             className="dark:border-gray-600 dark:bg-gray-700 bg-white dark:bg-gray-800"
           />

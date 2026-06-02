@@ -1,10 +1,11 @@
 import axios from "axios";
 import { API_URL } from "./endpoints";
 import useAuthStore from "../store/authStore";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 20000,
+  timeout: 45000,
 });
 
 let refreshPromise = null;
@@ -18,23 +19,20 @@ const showGlobalError = (error) => {
   if (!toastHandler || error.config?.silent) return;
 
   const status = error.response?.status;
-  const data = error.response?.data;
-  
+
   // Handle 401 separately (usually handled by interceptor or login page)
   if (status === 401) return;
 
   if (!status || status >= 500) {
     toastHandler({
       title: "Connection problem",
-      description: "The server did not respond as expected. Please try again.",
+      description: "We are still trying to reach the server. Please try again.",
       variant: "destructive",
     });
   } else if (status >= 400 && status < 500) {
-    // Show backend-provided error message if available
-    const message = data?.detail || data?.message || "An error occurred with your request.";
     toastHandler({
       title: "Request error",
-      description: message,
+      description: extractErrorMessage(error, "We could not complete that request. Please try again."),
       variant: "destructive",
     });
   }
@@ -83,7 +81,7 @@ api.interceptors.response.use(
 
         refreshPromise =
           refreshPromise ||
-          axios.post(`${API_URL}/refresh`, { refresh_token: refreshToken }, { timeout: 20000 });
+          axios.post(`${API_URL}/refresh`, { refresh_token: refreshToken }, { timeout: 45000 });
         const refreshResponse = await refreshPromise;
         const accessToken =
           refreshResponse.data.access_token ||

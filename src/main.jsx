@@ -11,10 +11,11 @@ const queryClient = new QueryClient({
     queries: {
       retry: (failureCount, error) => {
         // Only retry on network errors or 5xx server errors
-        if (failureCount >= 2) return false;
+        if (failureCount >= 3) return false;
         const status = error.response?.status;
         return !status || status >= 500;
       },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
       refetchOnWindowFocus: false,
       staleTime: 1000 * 60 * 5, // 5 minutes by default
       gcTime: 1000 * 60 * 30,    // 30 minutes garbage collection

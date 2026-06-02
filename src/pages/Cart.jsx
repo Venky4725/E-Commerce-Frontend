@@ -7,6 +7,7 @@ import { ShoppingCart, Loader2, PackageOpen, Trash2, Plus, Minus } from "lucide-
 import { useToast } from "../components/ui/toast";
 import useAuthStore from "../store/authStore";
 import { buildAssetUrl } from "../api/endpoints";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 const Cart = () => {
   const [items, setItems] = useState([]);   // enriched items: { product_id, quantity, product }
@@ -96,7 +97,7 @@ const Cart = () => {
       );
       toast({
         title: "Failed to update quantity",
-        description: err.response?.data?.detail || "Please try again.",
+        description: extractErrorMessage(err, "Please try again."),
         variant: "destructive",
       });
     } finally {
@@ -119,7 +120,7 @@ const Cart = () => {
       setItems(previousItems);
       toast({
         title: "Failed to remove item",
-        description: err.response?.data?.detail || "Please try again.",
+        description: extractErrorMessage(err, "Please try again."),
         variant: "destructive",
       });
     } finally {

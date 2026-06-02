@@ -106,7 +106,8 @@ const NotificationBell = () => {
     enabled: Boolean(ownerId) && !user?.is_admin,
     staleTime: 15000,
     refetchOnWindowFocus: false,
-    retry: 1,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 8000),
   });
 
   // Sync mutations
@@ -121,7 +122,9 @@ const NotificationBell = () => {
       if (err.response?.status === 404 || err.response?.status === 405) {
         markAllAsRead();
       }
-    }
+    },
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
   const markReadMutation = useMutation({
@@ -135,7 +138,9 @@ const NotificationBell = () => {
       if (err.response?.status === 404 || err.response?.status === 405) {
         markAsRead(id);
       }
-    }
+    },
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
   useEffect(() => {
@@ -163,8 +168,12 @@ const NotificationBell = () => {
   }, [isOpen]);
 
   const refreshNotifications = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ["notifications", ownerId] });
-    await query.refetch();
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["notifications", ownerId] });
+      await query.refetch();
+    } catch {
+      // React Query will retry and keep the last known notifications visible.
+    }
   }, [ownerId, query, queryClient]);
 
   const visibleNotifications = useMemo(() => notifications.slice(0, 50), [notifications]);
@@ -207,7 +216,7 @@ const NotificationBell = () => {
           </div>
 
           <div className="max-h-96 overflow-y-auto">
-            {query.isLoading ? (
+            {query.isLoading && visibleNotifications.length === 0 ? (
               <div className="py-12 text-center">
                 <Loader2 size={32} className="mx-auto mb-3 animate-spin text-blue-500" />
                 <p className="text-sm text-gray-500 dark:text-gray-400">Loading notifications...</p>

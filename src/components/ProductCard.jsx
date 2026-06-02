@@ -9,6 +9,7 @@ import useAuthStore from "../store/authStore";
 import { buildAssetUrl } from "../api/endpoints";
 import { HighlightText } from "./HighlightText";
 import { getCategoryPlaceholder } from "../lib/utils";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 function ProductCard({ product, highlight = "" }) {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ function ProductCard({ product, highlight = "" }) {
     } catch (err) {
       toast({
         title: "Failed to add to cart",
-        description: err.response?.data?.detail || "Try again",
+        description: extractErrorMessage(err, "Try again"),
         variant: "destructive",
       });
     }

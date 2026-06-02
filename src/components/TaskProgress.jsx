@@ -1,6 +1,7 @@
 import React from "react";
 import { Loader2, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import { Progress } from "./ui/progress"; // Need to check if this exists, else use div
+import { sanitizeErrorMessage } from "../lib/errorUtils";
 
 export const TaskProgress = ({ task, label }) => {
   if (!task) return null;
@@ -10,6 +11,8 @@ export const TaskProgress = ({ task, label }) => {
   const isDone = status === "completed" || status === "success";
   const isFailed = status === "failed" || status === "error";
   const isPending = !isDone && !isFailed;
+  const message = sanitizeErrorMessage(task.message, "");
+  const error = sanitizeErrorMessage(task.error, "");
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800/50">
@@ -34,16 +37,16 @@ export const TaskProgress = ({ task, label }) => {
 
       <Progress value={isDone ? 100 : progress} className={isFailed ? "[&>div]:bg-red-500" : isDone ? "[&>div]:bg-green-500" : ""} />
 
-      {task.message && (
+      {message && (
         <p className={`mt-2 text-xs ${isFailed ? "text-red-500" : "text-gray-600 dark:text-gray-400"}`}>
-          {task.message}
+          {message}
         </p>
       )}
 
-      {isFailed && task.error && (
+      {isFailed && error && (
         <div className="mt-2 flex items-start gap-1 rounded bg-red-50 p-2 text-[10px] text-red-700 dark:bg-red-900/20 dark:text-red-400">
           <AlertCircle size={12} className="mt-0.5 shrink-0" />
-          <span>{task.error}</span>
+          <span>{error}</span>
         </div>
       )}
     </div>

@@ -8,6 +8,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useLoginMutation } from "../hooks/useAuth";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -32,7 +33,7 @@ const Login = () => {
     try {
       await loginMutation.mutateAsync(data);
     } catch (err) {
-      setServerError(err.response?.data?.detail || err.message || "Login failed. Check your credentials.");
+      setServerError(extractErrorMessage(err, "Login failed. Check your credentials."));
     }
   };
 

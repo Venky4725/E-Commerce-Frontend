@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { sanitizeErrorMessage } from "../lib/errorUtils";
 
 const getOwnerId = (notification) =>
   notification.userId || notification.user_id || notification.recipient_id || notification.ownerId;
@@ -40,16 +41,19 @@ const useNotificationStore = create(
           `${notification.type || "notification"}-${notification.order_id || notification.orderId || ""}-${notification.timestamp || Date.now()}`
         );
 
+        const safeTitle = sanitizeErrorMessage(notification.title, "Order update");
+        const safeMessage = sanitizeErrorMessage(notification.message, "Your order status changed.");
+
         const newNotification = {
+          ...notification,
           id,
           userId: normalizedOwnerId || state.currentUserId,
           timestamp: notification.created_at || notification.timestamp || new Date().toISOString(),
           read: Boolean(notification.read),
           type: notification.type || "order_processing",
-          title: notification.title || "Order update",
-          message: notification.message || "Your order status changed.",
+          title: safeTitle,
+          message: safeMessage,
           orderId: notification.order_id || notification.orderId,
-          ...notification,
         };
 
         set((current) => {

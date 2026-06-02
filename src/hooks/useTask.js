@@ -1,13 +1,15 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+import { sanitizeErrorMessage } from "../lib/errorUtils";
 
 const normalizeTask = (data) => ({
+  ...data,
   id: data.task_id || data.id,
   status: data.status || "queued",
   progress: Number(data.progress ?? data.percent ?? 0),
   result: data.result,
-  error: data.error || data.message,
-  ...data,
+  message: sanitizeErrorMessage(data.message, ""),
+  error: sanitizeErrorMessage(data.error || data.message, ""),
 });
 
 export function useTaskPolling(taskId) {

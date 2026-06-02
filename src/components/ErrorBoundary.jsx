@@ -58,19 +58,6 @@ class ErrorBoundary extends React.Component {
               We're sorry for the inconvenience. The application encountered an unexpected error.
             </p>
 
-            {/* Show error details in development */}
-            {import.meta.env.DEV && this.state.error && (
-              <details className="mb-6 text-left">
-                <summary className="cursor-pointer text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Error Details (Development Only)
-                </summary>
-                <pre className="text-xs bg-gray-100 dark:bg-gray-900 p-4 rounded overflow-auto max-h-40">
-                  {this.state.error.toString()}
-                  {this.state.errorInfo && this.state.errorInfo.componentStack}
-                </pre>
-              </details>
-            )}
-
             <div className="flex gap-3 justify-center">
               <Button
                 onClick={this.handleReset}

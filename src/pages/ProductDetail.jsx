@@ -9,6 +9,7 @@ import api from "../api/api";
 import useAuthStore from "../store/authStore";
 import { buildAssetUrl } from "../api/endpoints";
 import { getCategoryPlaceholder } from "../lib/utils";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 const ProductDetail = () => {
   const { id } = useParams();
@@ -37,7 +38,7 @@ const ProductDetail = () => {
     } catch (err) {
       toast({
         title: "Failed to add to cart",
-        description: err.response?.data?.detail || "Try again",
+        description: extractErrorMessage(err, "Try again"),
         variant: "destructive",
       });
     } finally {

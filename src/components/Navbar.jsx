@@ -22,6 +22,7 @@ const Navbar = () => {
 
   const isConnected = connectionState === "connected";
   const isConnecting = connectionState === "connecting" || connectionState === "reconnecting";
+  const connectionLabel = isConnected ? "Connected" : isConnecting ? "Reconnecting..." : "Reconnecting...";
 
   const navLinkClass = ({ isActive }) =>
     isActive
@@ -53,7 +54,7 @@ const Navbar = () => {
                       ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800"
                       : "bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800"
                 }`}
-                title={`WebSocket: ${connectionState}`}
+                title={connectionLabel}
               >
                 {isConnecting ? (
                   <RefreshCw size={10} className="animate-spin" />
@@ -62,7 +63,7 @@ const Navbar = () => {
                 ) : (
                   <WifiOff size={10} />
                 )}
-                <span className="hidden sm:inline capitalize">{connectionState}</span>
+                <span className="hidden sm:inline">{connectionLabel}</span>
               </div>
             )}
           </div>

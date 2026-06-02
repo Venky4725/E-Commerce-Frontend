@@ -11,6 +11,7 @@ import { useToast } from "../../components/ui/toast";
 import { Loader2, Pencil, Trash2, Plus, X, RefreshCw, Upload } from "lucide-react";
 import { buildAssetUrl } from "../../api/endpoints";
 import BulkUploadModal from "../../components/BulkUploadModal";
+import { extractErrorMessage } from "../../lib/errorUtils";
 
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -53,7 +54,7 @@ const ProductForm = ({ initial, onClose, onSaved }) => {
     } catch (err) {
       toast({
         title: "Failed to save product",
-        description: err.response?.data?.detail || "Try again",
+        description: extractErrorMessage(err, "Try again"),
         variant: "destructive",
       });
     } finally {
@@ -172,7 +173,7 @@ const AdminProducts = () => {
       setDeletingId(null);
 
       const status = err.response?.status;
-      const detail = err.response?.data?.detail || err.response?.data?.message || "";
+      const detail = extractErrorMessage(err, "");
 
       if (status === 404 || String(detail).toLowerCase().includes("not found")) {
         toast({ title: "Product already deleted", description: "The product was already removed.", variant: "default" });

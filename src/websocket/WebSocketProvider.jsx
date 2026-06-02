@@ -10,6 +10,7 @@ export const WebSocketProvider = React.memo(function WebSocketProvider({ childre
   const token = useAuthStore((state) => state.token);
   const isConnected = value.connectionState === "connected";
   const isConnecting = value.connectionState === "connecting" || value.connectionState === "reconnecting";
+  const connectionLabel = isConnected ? "Connected" : "Reconnecting...";
 
   return (
     <WebSocketContext.Provider value={value}>
@@ -23,7 +24,7 @@ export const WebSocketProvider = React.memo(function WebSocketProvider({ childre
           ) : (
             <WifiOff size={14} className="text-yellow-500" />
           )}
-          <span className="capitalize">{value.connectionState}</span>
+          <span>{connectionLabel}</span>
           {!isConnected && (
             <button
               type="button"

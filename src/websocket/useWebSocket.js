@@ -9,7 +9,6 @@ const CONNECTING = "connecting";
 const RECONNECTING = "reconnecting";
 const CONNECTED = "connected";
 const DISCONNECTED = "disconnected";
-const ERROR = "error";
 const IDLE = "idle";
 
 const normalizeMessage = (event) => {
@@ -34,7 +33,7 @@ const isChatEvent = (type) => ["chat.message", "chat_message", "message", "chat"
 
   // Normalize chat user/session routing for admin<->customer realtime.
   // Best-effort: if backend provides session_id/room_id, we store by customerId as well.
-  const getChatParticipants = (payload) => {
+  const getChatParticipants = (payload, currentUser) => {
     let customerId = payload.customer_id || payload.user_id || payload.userId;
     
     // Normalize customerId with user- prefix if it looks like a raw ID
@@ -43,7 +42,7 @@ const isChatEvent = (type) => ["chat.message", "chat_message", "message", "chat"
     }
 
     const senderId = payload.user_id || payload.userId;
-    const adminId = payload.admin_id || (user?.is_admin ? senderId : null);
+    const adminId = payload.admin_id || (currentUser?.is_admin ? senderId : null);
 
     // If payload includes explicit session/room, keep it as metadata.
     const sessionId = payload.session_id || payload.room_id || payload.conversation_id || null;
@@ -123,7 +122,7 @@ export function useWebSocket() {
       if (isOrderEvent(type)) {
         applyOrderEvent(payload);
       } else if (isChatEvent(type)) {
-        const { customerId, senderId, sessionId } = getChatParticipants(payload);
+        const { customerId, senderId } = getChatParticipants(payload, user);
         const targetUserId = customerId || userId || "anonymous";
         const msgId = payload.id || `${payload.user_id || payload.username || "support"}-${payload.timestamp || Date.now()}`;
 
@@ -237,23 +236,24 @@ export function useWebSocket() {
         if (socketRef.current === socket) {
            socketRef.current = null;
         }
-        setConnectionState(DISCONNECTED);
-        
         if (shouldReconnectRef.current && token) {
           const delay = Math.min(30000, 1000 * Math.pow(2, attemptsRef.current));
+          setConnectionState(RECONNECTING);
           setNextRetryAt(Date.now() + delay);
           attemptsRef.current += 1;
           reconnectTimerRef.current = window.setTimeout(connect, delay);
+        } else {
+          setConnectionState(DISCONNECTED);
         }
       };
 
       socket.onerror = (error) => {
-        console.error("❌ WebSocket Error:", error);
-        setConnectionState(ERROR);
+        console.error("WebSocket connection interrupted:", error);
+        setConnectionState(RECONNECTING);
       };
     } catch (err) {
-      console.error("❌ Failed to create WebSocket:", err);
-      setConnectionState(ERROR);
+      console.error("Failed to create WebSocket connection:", err);
+      setConnectionState(RECONNECTING);
       // Try to reconnect even if creation failed
       if (shouldReconnectRef.current && token) {
         const delay = Math.min(30000, 1000 * Math.pow(2, attemptsRef.current));
@@ -294,4 +294,3 @@ export function useWebSocket() {
 
   return { connectionState, nextRetryAt, sendJson, reconnect };
 }
-

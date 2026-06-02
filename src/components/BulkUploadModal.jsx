@@ -7,6 +7,7 @@ import { useToast } from "./ui/toast";
 import api from "../api/api";
 import { useTaskPolling } from "../hooks/useTask";
 import { TaskProgress } from "./TaskProgress";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 const BulkUploadModal = ({ onClose, onSaved }) => {
   const { toast } = useToast();
@@ -29,7 +30,7 @@ const BulkUploadModal = ({ onClose, onSaved }) => {
     onError: (err) => {
       toast({
         title: "Upload failed",
-        description: err.response?.data?.detail || "Make sure it's a valid CSV",
+        description: extractErrorMessage(err, "Make sure it's a valid CSV"),
         variant: "destructive",
       });
     },

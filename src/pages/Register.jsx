@@ -8,6 +8,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "../components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useRegisterMutation } from "../hooks/useAuth";
+import { extractErrorMessage } from "../lib/errorUtils";
 
 const registerSchema = z
   .object({
@@ -42,7 +43,7 @@ const Register = () => {
         password: data.password,
       });
     } catch (err) {
-      setServerError(err.response?.data?.detail || "Registration failed. Please try again.");
+      setServerError(extractErrorMessage(err, "Registration failed. Please try again."));
     }
   };
 

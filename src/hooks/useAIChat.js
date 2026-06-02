@@ -3,10 +3,11 @@ import useAuthStore from "../store/authStore";
 import { API_URL } from "../api/endpoints";
 import { useToast } from "../components/ui/toast";
 import { preprocessQuery, getDynamicSuggestions } from "../lib/aiQueryUtils";
+import { sanitizeErrorMessage } from "../lib/errorUtils";
 
 const AI_FALLBACK_MESSAGE = "I’m pulling the best ShopKart options for you right now.";
 const AI_ERROR_MESSAGE = "I’m having trouble connecting right now. Please try again in a moment — I’ll keep the shopping flow smooth.";
-const STREAM_TIMEOUT_MS = 10000;
+const STREAM_TIMEOUT_MS = 45000;
 
 const suggestionMap = {
   best_laptops: {
@@ -94,7 +95,8 @@ export const useAIChat = () => {
   useEffect(() => {
     messagesRef.current = messages;
     try {
-      localStorage.setItem(storageKey, JSON.stringify(messages));
+      const persistableMessages = messages.filter((message) => !message.isStreaming);
+      localStorage.setItem(storageKey, JSON.stringify(persistableMessages));
     } catch (e) {
       console.error("Failed to save AI chat history", e);
     }
@@ -429,11 +431,11 @@ export const useAIChat = () => {
       resetInactivityTimeout();
 
       try {
-        const isFollowUp = meta.intent === "follow_up" && activeProduct;
+        const isFollowUp = meta.intent === "follow_up" && !!activeProduct;
         const payload = {
           messages: [
             ...messagesRef.current
-              .filter(m => !m.isError && m.content)
+              .filter(m => !m.isError && !m.isStreaming && m.content)
               .map(m => ({ role: m.role, content: m.content })),
             { role: "user", content: meta.normalized }
           ],
@@ -469,7 +471,12 @@ export const useAIChat = () => {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.detail || errorData.message || "Failed to connect to AI assistant");
+          throw new Error(
+            sanitizeErrorMessage(
+              errorData.detail || errorData.message,
+              "Failed to connect to AI assistant"
+            )
+          );
         }
 
         if (!response.body) {
@@ -519,7 +526,7 @@ export const useAIChat = () => {
         console.error("AI Chat Error:", error);
 
         let friendlyMessage = "I’m having trouble connecting right now. Please try again in a moment — I’ll keep the shopping flow smooth.";
-        const errorStr = String(error?.message || error).toLowerCase();
+        const errorStr = sanitizeErrorMessage(error?.message || error, "").toLowerCase();
 
         if (errorStr.includes("rate limit") || errorStr.includes("429")) {
           friendlyMessage = "I’m a little busy right now. Please wait a few seconds before asking again.";
